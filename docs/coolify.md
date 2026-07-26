@@ -35,10 +35,8 @@ https://api-crm.seudominio.com/api/v1/webhooks/whatsapp
 
 ```env
 POSTGRES_USER=wa_crm
-POSTGRES_PASSWORD=troque-esta-senha
 POSTGRES_DB=wa_crm
 
-JWT_SECRET=gere-uma-chave-grande
 JWT_EXPIRES_IN=7d
 
 FRONTEND_URL=https://crm.seudominio.com
@@ -53,6 +51,13 @@ WHATSAPP_PHONE_NUMBER_ID=id-do-numero
 WHATSAPP_BUSINESS_ACCOUNT_ID=id-da-waba
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=um-token-secreto-para-validacao
 ```
+
+O `docker-compose.coolify.yml` usa variaveis magicas do Coolify para gerar e persistir:
+
+- `SERVICE_PASSWORD_POSTGRES`
+- `SERVICE_PASSWORD_64_JWT`
+
+Nao crie essas duas variaveis manualmente com valor vazio.
 
 ## Primeiro acesso
 
