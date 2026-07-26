@@ -38,6 +38,9 @@ POSTGRES_USER=wa_crm
 POSTGRES_DB=wa_crm
 
 JWT_EXPIRES_IN=7d
+ADMIN_EMAIL=admin@crm.local
+ADMIN_PASSWORD=admin123
+ADMIN_NAME=Administrador
 
 FRONTEND_URL=https://crm.seudominio.com
 PUBLIC_API_URL=https://api-crm.seudominio.com

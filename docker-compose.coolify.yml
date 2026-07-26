@@ -39,6 +39,9 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${SERVICE_PASSWORD_64_JWT}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@crm.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrador}
       FRONTEND_URL: ${FRONTEND_URL:?}
       PUBLIC_API_URL: ${PUBLIC_API_URL:?}
       DEFAULT_ORGANIZATION_ID: ${DEFAULT_ORGANIZATION_ID:-demo-org}
