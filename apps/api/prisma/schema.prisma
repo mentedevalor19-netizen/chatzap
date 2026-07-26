@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  AGENT
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING
+  CLOSED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  LOCATION
+  CONTACT
+  STICKER
+  TEMPLATE
+  SYSTEM
+}
+
+enum MessageStatus {
+  QUEUED
+  RECEIVED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users         User[]
+  contacts      Contact[]
+  conversations Conversation[]
+  messages      Message[]
+  tags          Tag[]
+  notes         Note[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  email          String   @unique
+  name           String
+  passwordHash   String   @map("password_hash")
+  role           UserRole @default(AGENT)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization          Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages              Message[]
+  notes                 Note[]
+  assignedConversations Conversation[] @relation("AssignedConversations")
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+model Contact {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  waId           String   @map("wa_id")
+  phone          String
+  name           String
+  avatarUrl      String?  @map("avatar_url")
+  lastSeenAt     DateTime? @map("last_seen_at")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  messages      Message[]
+  tags          ContactTag[]
+  notes         Note[]
+
+  @@unique([organizationId, waId])
+  @@index([organizationId, phone])
+  @@index([organizationId, name])
+  @@map("contacts")
+}
+
+model Conversation {
+  id             String             @id @default(cuid())
+  organizationId String             @map("organization_id")
+  contactId      String             @map("contact_id")
+  assignedToId   String?            @map("assigned_to_id")
+  status         ConversationStatus @default(OPEN)
+  unreadCount    Int                @default(0) @map("unread_count")
+  lastMessageAt  DateTime?          @map("last_message_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  assignedTo   User?        @relation("AssignedConversations", fields: [assignedToId], references: [id], onDelete: SetNull)
+  messages     Message[]
+
+  @@index([organizationId, status, lastMessageAt])
+  @@index([organizationId, contactId])
+  @@map("conversations")
+}
+
+model Message {
+  id                String           @id @default(cuid())
+  organizationId    String           @map("organization_id")
+  conversationId    String           @map("conversation_id")
+  contactId         String           @map("contact_id")
+  senderUserId      String?          @map("sender_user_id")
+  waMessageId       String?          @unique @map("wa_message_id")
+  direction         MessageDirection
+  type              MessageType
+  status            MessageStatus    @default(QUEUED)
+  body              String?
+  mediaId           String?          @map("media_id")
+  mediaUrl          String?          @map("media_url")
+  mimeType          String?          @map("mime_type")
+  fileName          String?          @map("file_name")
+  caption           String?
+  locationLatitude  Decimal?         @map("location_latitude") @db.Decimal(10, 7)
+  locationLongitude Decimal?         @map("location_longitude") @db.Decimal(10, 7)
+  locationName      String?          @map("location_name")
+  locationAddress   String?          @map("location_address")
+  contactPayload    Json?            @map("contact_payload")
+  rawPayload        Json?            @map("raw_payload")
+  sentAt            DateTime?        @map("sent_at")
+  deliveredAt       DateTime?        @map("delivered_at")
+  readAt            DateTime?        @map("read_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  senderUser   User?        @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, conversationId, createdAt])
+  @@index([organizationId, contactId])
+  @@index([organizationId, direction, status])
+  @@map("messages")
+}
+
+model Tag {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  color          String
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacts     ContactTag[]
+
+  @@unique([organizationId, name])
+  @@map("tags")
+}
+
+model ContactTag {
+  contactId      String   @map("contact_id")
+  tagId          String   @map("tag_id")
+  organizationId String   @map("organization_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+  @@index([organizationId])
+  @@map("contact_tags")
+}
+
+model Note {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  contactId      String   @map("contact_id")
+  userId         String   @map("user_id")
+  body           String
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, contactId, createdAt])
+  @@map("notes")
+}
