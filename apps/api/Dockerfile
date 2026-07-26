@@ -20,6 +20,6 @@ COPY pnpm-lock.yaml ./
 COPY apps/api ./apps/api
 WORKDIR /app/apps/api
 RUN pnpm prisma generate
-RUN pnpm build
+RUN pnpm exec tsc -p tsconfig.build.json --pretty false
 EXPOSE 4000
 CMD ["node", "dist/main.js"]

@@ -92,3 +92,13 @@ Assine os eventos de mensagens e status do WhatsApp Business Account.
 - Nao adicione redes customizadas no compose; o Coolify cria a rede do stack.
 - Os uploads ficam no volume persistente `api_uploads`.
 - Se trocar `NEXT_PUBLIC_API_URL` ou `NEXT_PUBLIC_WS_URL`, faca novo deploy para reconstruir o frontend.
+
+## Troubleshooting
+
+Se o deploy falhar em `RUN pnpm prisma generate`, o build nao recebeu uma `DATABASE_URL`.
+O Dockerfile da API ja define uma URL dummy para build; confirme que a VPS esta usando a versao atual do repositorio.
+
+Se falhar em `RUN pnpm exec tsc -p tsconfig.build.json --pretty false`, expanda os logs completos do step no Coolify.
+O erro real aparece algumas linhas acima do resumo `failed to solve`.
+
+Se o log mostrar um commit antigo, faca commit/push das alteracoes locais e redeploy.
