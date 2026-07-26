@@ -6,7 +6,8 @@ coverage
 .env
 .env.local
 .env.*.local
-uploads
+/uploads/
+apps/api/uploads/
 *.log
 *.tsbuildinfo
 Dockerfile.local
