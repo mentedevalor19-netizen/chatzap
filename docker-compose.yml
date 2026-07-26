@@ -51,6 +51,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    command: sh -c "pnpm prisma migrate deploy && pnpm prisma db seed && pnpm exec ts-node -r tsconfig-paths/register src/main.ts"
     volumes:
       - ./apps/api/uploads:/app/apps/api/uploads
 
