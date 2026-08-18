@@ -29,6 +29,7 @@ CRM de atendimento via WhatsApp construído exclusivamente sobre a API Oficial d
 │   └── web                 # Next.js 15, React, TailwindCSS, shadcn-style UI
 │       ├── app
 │       ├── components
+│       │   ├── admin
 │       │   ├── auth
 │       │   ├── chat
 │       │   └── ui
@@ -55,8 +56,11 @@ Os modelos estão em `apps/api/prisma/schema.prisma`.
 - `Tag`: tags coloridas por organização.
 - `ContactTag`: relacionamento muitos-para-muitos entre contatos e tags.
 - `Note`: notas internas do contato.
+- `Funnel`: funil ativo por organização.
+- `FunnelStep`: etapas ordenadas com texto, imagem, áudio, vídeo ou documento.
+- `ConversationFunnelRun`: estado de execução do funil em cada conversa.
 
-A migration inicial está em `apps/api/prisma/migrations/20260726120000_init/migration.sql`.
+As migrations estão em `apps/api/prisma/migrations`.
 
 ## 3. Endpoints da API
 
@@ -83,8 +87,11 @@ Base local: `http://localhost:4000/api/v1`
 | `PATCH` | `/conversations/:id/status` | Altera status |
 | `PATCH` | `/conversations/:id/assign` | Atribui atendente |
 | `POST` | `/conversations/:id/read` | Zera não lidas |
+| `POST` | `/conversations/:id/funnel/start` | Envia o funil inicial e encaminha para humano |
 | `GET` | `/conversations/:id/messages?cursor=&limit=` | Histórico com paginação |
 | `POST` | `/conversations/:id/messages` | Envia texto, mídia, localização, contato ou template |
+| `GET` | `/funnels/active` | Retorna o funil ativo da organização |
+| `PUT` | `/funnels/active` | Cria/atualiza o funil ativo |
 | `POST` | `/uploads` | Upload com Multer |
 | `GET` | `/uploads/files/:fileName` | Download/URL pública local |
 | `GET` | `/search?q=` | Busca global |
@@ -101,8 +108,11 @@ Base local: `http://localhost:4000/api/v1`
 6. Abre ou reutiliza uma conversa não finalizada.
 7. Persiste a mensagem no PostgreSQL com `rawPayload`.
 8. Para mídias, salva `mediaId`, `mimeType`, legenda, arquivo e tenta resolver a URL temporária pela Cloud API.
-9. Para status `sent`, `delivered`, `read` ou `failed`, atualiza a mensagem outbound pelo `waMessageId`.
-10. O `RealtimeGateway` publica `conversation.upsert`, `message.created` e `message.status` via Socket.IO.
+9. Na primeira mensagem recebida de uma conversa nova, inicia o funil ativo.
+10. Se uma etapa estiver marcada para aguardar resposta, o funil pausa e continua na próxima mensagem inbound, independentemente do conteúdo.
+11. Ao concluir o funil, a conversa é atribuída a um humano e recebe uma mensagem interna de handoff.
+12. Para status `sent`, `delivered`, `read` ou `failed`, atualiza a mensagem outbound pelo `waMessageId`.
+13. O `RealtimeGateway` publica `conversation.upsert`, `message.created` e `message.status` via Socket.IO.
 
 ## 5. Telas do Frontend
 
@@ -120,6 +130,8 @@ Base local: `http://localhost:4000/api/v1`
   - drag-and-drop de arquivos;
   - preview de upload;
   - painel lateral com dados, tags, notas e status.
+  - botão manual para enviar o funil inicial e iniciar o handoff humano.
+  - aba `Admin` para configurar o funil ativo com texto, imagem, áudio, vídeo e documento.
 
 ## 6. Componentes Reutilizáveis
 
@@ -145,6 +157,7 @@ Componentes de domínio em `apps/web/components/chat`:
 - `MessageBubble`
 - `MessageComposer`
 - `ContactPanel`
+- `FunnelAdminPanel`
 - `StatusIcon`
 
 ## 7. Docker Compose
@@ -189,6 +202,10 @@ Principais chaves:
 - `WHATSAPP_PHONE_NUMBER_ID`
 - `WHATSAPP_BUSINESS_ACCOUNT_ID`
 - `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
+- `FUNNEL_ENABLED`
+- `FUNNEL_ASSIGN_TO_HUMAN`
+- `FUNNEL_MESSAGE_1` até `FUNNEL_MESSAGE_5`
+- `FUNNEL_HANDOFF_MESSAGE`
 - `NEXT_PUBLIC_API_URL`
 - `NEXT_PUBLIC_WS_URL`
 
@@ -225,10 +242,11 @@ URLs locais:
 4. Conversas: receber primeira mensagem via webhook e conferir criação automática.
 5. Realtime: abrir duas abas e validar eventos Socket.IO.
 6. Envio texto: configurar credenciais Meta e enviar mensagem outbound.
-7. Mídias: testar upload local, depois troca para upload direto na Cloud API ou storage público.
-8. Status: validar webhooks `sent`, `delivered`, `read` e `failed`.
-9. Busca: validar pesquisa por nome, telefone e conteúdo.
-10. Escala: adicionar filas, múltiplos números, chatbot/IA e políticas de retenção sem alterar o núcleo do chat.
+7. Funil: configurar etapas na aba `Admin`, marcar a pergunta para aguardar resposta e testar a continuação com qualquer resposta do cliente.
+8. Mídias: testar upload local, depois troca para upload direto na Cloud API ou storage público.
+9. Status: validar webhooks `sent`, `delivered`, `read` e `failed`.
+10. Busca: validar pesquisa por nome, telefone e conteúdo.
+11. Escala: adicionar filas, múltiplos números, chatbot/IA e políticas de retenção sem alterar o núcleo do chat.
 
 ## Validação
 

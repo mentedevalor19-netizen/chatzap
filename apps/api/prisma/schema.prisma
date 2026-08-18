@@ -45,18 +45,36 @@ enum MessageStatus {
   FAILED
 }
 
+enum FunnelStepType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+}
+
+enum FunnelRunStatus {
+  RUNNING
+  WAITING_FOR_REPLY
+  COMPLETED
+  CANCELLED
+}
+
 model Organization {
   id        String   @id @default(cuid())
   name      String
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  users         User[]
-  contacts      Contact[]
+  users        User[]
+  contacts     Contact[]
   conversations Conversation[]
-  messages      Message[]
-  tags          Tag[]
-  notes         Note[]
+  messages     Message[]
+  tags         Tag[]
+  notes        Note[]
+  funnels      Funnel[]
+  funnelSteps  FunnelStep[]
+  funnelRuns   ConversationFunnelRun[]
 
   @@map("organizations")
 }
@@ -119,6 +137,7 @@ model Conversation {
   contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
   assignedTo   User?        @relation("AssignedConversations", fields: [assignedToId], references: [id], onDelete: SetNull)
   messages     Message[]
+  funnelRuns   ConversationFunnelRun[]
 
   @@index([organizationId, status, lastMessageAt])
   @@index([organizationId, contactId])
@@ -208,4 +227,67 @@ model Note {
 
   @@index([organizationId, contactId, createdAt])
   @@map("notes")
+}
+
+model Funnel {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  isActive       Boolean  @default(false) @map("is_active")
+  handoffMessage String?  @map("handoff_message")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  steps        FunnelStep[]
+  runs         ConversationFunnelRun[]
+
+  @@index([organizationId, isActive])
+  @@map("funnels")
+}
+
+model FunnelStep {
+  id             String         @id @default(cuid())
+  organizationId String         @map("organization_id")
+  funnelId       String         @map("funnel_id")
+  position       Int
+  type           FunnelStepType @default(TEXT)
+  body           String?
+  mediaId        String?        @map("media_id")
+  mediaUrl       String?        @map("media_url")
+  mimeType       String?        @map("mime_type")
+  fileName       String?        @map("file_name")
+  caption        String?
+  waitForReply   Boolean        @default(false) @map("wait_for_reply")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  funnel       Funnel       @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+
+  @@unique([funnelId, position])
+  @@index([organizationId, funnelId, position])
+  @@map("funnel_steps")
+}
+
+model ConversationFunnelRun {
+  id               String          @id @default(cuid())
+  organizationId   String          @map("organization_id")
+  conversationId   String          @map("conversation_id")
+  funnelId         String          @map("funnel_id")
+  status           FunnelRunStatus @default(RUNNING)
+  nextStepPosition Int             @default(1) @map("next_step_position")
+  awaitingReply    Boolean         @default(false) @map("awaiting_reply")
+  startedAt        DateTime        @default(now()) @map("started_at")
+  completedAt      DateTime?       @map("completed_at")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  funnel       Funnel       @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([organizationId, conversationId, status])
+  @@map("conversation_funnel_runs")
 }

@@ -54,6 +54,12 @@ WHATSAPP_ACCESS_TOKEN=token-da-meta
 WHATSAPP_PHONE_NUMBER_ID=id-do-numero
 WHATSAPP_BUSINESS_ACCOUNT_ID=id-da-waba
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=um-token-secreto-para-validacao
+
+FUNNEL_ENABLED=true
+FUNNEL_ASSIGN_TO_HUMAN=true
+FUNNEL_MESSAGE_1=Ola! Recebemos sua mensagem. Para agilizar, responda com uma opcao: 1 - Comercial, 2 - Suporte, 3 - Financeiro.
+FUNNEL_MESSAGE_2=Perfeito. Ja estou chamando um especialista para continuar seu atendimento por aqui.
+FUNNEL_HANDOFF_MESSAGE=Atendimento humano iniciado.
 ```
 
 O `docker-compose.coolify.yml` usa variaveis magicas do Coolify para gerar e persistir:
@@ -90,6 +96,19 @@ No app da Meta, configure o webhook:
 - Verify token: o mesmo valor de `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
 
 Assine os eventos de mensagens e status do WhatsApp Business Account.
+
+## Funil e handoff humano
+
+Com `FUNNEL_ENABLED=true`, a API envia automaticamente o funil na primeira mensagem recebida de uma conversa nova.
+Se uma etapa estiver marcada para aguardar resposta, o funil pausa e continua na proxima mensagem recebida, independente do conteudo respondido pelo cliente.
+Depois da ultima etapa, a conversa fica como `OPEN`, recebe uma mensagem interna de handoff e e atribuida ao primeiro usuario `ADMIN` ou `AGENT` da organizacao.
+
+Tambem existe acionamento manual no painel lateral do contato pelo botao `Enviar funil`.
+Para alterar o roteiro sem redeploy, acesse a aba `Admin` dentro do CRM e edite o funil ativo.
+As variaveis `FUNNEL_MESSAGE_1` ate `FUNNEL_MESSAGE_5` continuam servindo como fallback e seed inicial.
+
+Arquivos de imagem, audio, video e PDF anexados ao funil usam o dominio publico da API.
+Em producao, mantenha `PUBLIC_API_URL` apontando para `https://api-crm.seudominio.com`, porque a Meta precisa acessar essa URL para enviar midias pela Cloud API.
 
 ## Observacoes importantes
 

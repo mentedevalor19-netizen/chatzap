@@ -9,6 +9,16 @@ import { cn, formatMessageTime } from '@/lib/utils';
 export function MessageBubble({ message }: { message: ChatMessage }) {
   const outbound = message.direction === 'OUTBOUND';
 
+  if (message.type === 'SYSTEM') {
+    return (
+      <div className="flex justify-center px-4 py-2">
+        <span className="max-w-[82%] rounded-md border border-border bg-card px-3 py-1 text-center text-xs text-muted-foreground shadow-sm">
+          {message.body}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className={cn('flex px-4 py-1.5', outbound ? 'justify-end' : 'justify-start')}>
       <div

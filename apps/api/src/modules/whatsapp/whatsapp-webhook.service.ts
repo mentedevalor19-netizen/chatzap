@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { MessageStatus, MessageType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { FunnelService } from './funnel.service';
 import { WhatsappService } from './whatsapp.service';
 import {
   WhatsappInboundMessage,
@@ -18,6 +19,7 @@ export class WhatsappWebhookService {
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeGateway,
     private readonly whatsapp: WhatsappService,
+    private readonly funnel: FunnelService,
     private readonly config: ConfigService,
   ) {}
 
@@ -138,6 +140,7 @@ export class WhatsappWebhookService {
     this.realtime.emitToConversation(organizationId, conversation.id, 'message.created', savedMessage);
 
     void this.whatsapp.markIncomingAsRead(message.id).catch(() => undefined);
+    void this.funnel.startAfterFirstInbound(conversation.id);
   }
 
   private async handleStatus(organizationId: string, status: WhatsappStatusUpdate) {

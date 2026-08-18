@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Clock3, Save, StickyNote, Tag, Trash2, X } from 'lucide-react';
+import { CheckCircle2, Clock3, Save, StickyNote, Tag, Trash2, Workflow, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ConversationSummary, Note } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,6 +23,7 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
   const [phone, setPhone] = useState(conversation?.contact.phone ?? '');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [startingFunnel, setStartingFunnel] = useState(false);
 
   const notesQuery = useQuery({
     queryKey: ['contact-notes', conversation?.contact.id],
@@ -73,6 +74,22 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
       body: JSON.stringify({ status }),
     });
     await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+  }
+
+  async function startFunnel() {
+    setStartingFunnel(true);
+    try {
+      await apiFetch(`/conversations/${activeConversation.id}/funnel/start`, {
+        method: 'POST',
+      });
+      await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      await queryClient.invalidateQueries({ queryKey: ['messages', activeConversation.id] });
+      toast.success('Funil enviado e atendimento encaminhado.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Nao foi possivel iniciar o funil.');
+    } finally {
+      setStartingFunnel(false);
+    }
   }
 
   async function createNote() {
@@ -130,6 +147,23 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
             Salvar
           </Button>
         </form>
+
+        <Separator />
+
+        <section className="space-y-3 px-4 py-4">
+          <p className="text-xs font-semibold uppercase text-muted-foreground">Atendimento</p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            disabled={startingFunnel}
+            onClick={() => void startFunnel()}
+          >
+            <Workflow />
+            {startingFunnel ? 'Enviando...' : 'Enviar funil'}
+          </Button>
+        </section>
 
         <Separator />
 

@@ -28,6 +28,9 @@ export const messageStatuses = [
 ] as const;
 export type MessageStatus = (typeof messageStatuses)[number];
 
+export const funnelStepTypes = ['TEXT', 'IMAGE', 'VIDEO', 'AUDIO', 'DOCUMENT'] as const;
+export type FunnelStepType = (typeof funnelStepTypes)[number];
+
 export type RealtimeEvent =
   | 'conversation.upsert'
   | 'conversation.read'
@@ -92,4 +95,25 @@ export interface ChatMessage {
   sentAt?: string | null;
   deliveredAt?: string | null;
   readAt?: string | null;
+}
+
+export interface FunnelStepSummary {
+  id: string;
+  position: number;
+  type: FunnelStepType;
+  body?: string | null;
+  mediaId?: string | null;
+  mediaUrl?: string | null;
+  mimeType?: string | null;
+  fileName?: string | null;
+  caption?: string | null;
+  waitForReply: boolean;
+}
+
+export interface FunnelSummary {
+  id: string;
+  name: string;
+  isActive: boolean;
+  handoffMessage?: string | null;
+  steps: FunnelStepSummary[];
 }

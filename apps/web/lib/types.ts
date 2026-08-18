@@ -1,6 +1,22 @@
-import type { AuthUser, ChatMessage, ContactSummary, ConversationSummary } from '@wa-crm/shared';
+import type {
+  AuthUser,
+  ChatMessage,
+  ContactSummary,
+  ConversationSummary,
+  FunnelStepSummary,
+  FunnelStepType,
+  FunnelSummary,
+} from '@wa-crm/shared';
 
-export type { AuthUser, ChatMessage, ContactSummary, ConversationSummary };
+export type {
+  AuthUser,
+  ChatMessage,
+  ContactSummary,
+  ConversationSummary,
+  FunnelStepSummary,
+  FunnelStepType,
+  FunnelSummary,
+};
 
 export interface PaginatedMessages {
   items: ChatMessage[];

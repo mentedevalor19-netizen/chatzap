@@ -1,6 +1,6 @@
 'use client';
 
-import { LogOut, MessageSquareText, Plus, Search, UsersRound } from 'lucide-react';
+import { Bot, LogOut, MessageSquareText, Plus, Search, UsersRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { ContactSummary, ConversationSummary } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -19,6 +19,8 @@ import { cn, formatPhone, initials } from '@/lib/utils';
 interface ConversationSidebarProps {
   conversations: ConversationSummary[];
   loading: boolean;
+  tab: 'conversations' | 'contacts' | 'admin';
+  onTabChange: (tab: 'conversations' | 'contacts' | 'admin') => void;
 }
 
 const statusFilters = [
@@ -28,7 +30,7 @@ const statusFilters = [
   { value: 'CLOSED', label: 'Finalizadas' },
 ] as const;
 
-export function ConversationSidebar({ conversations, loading }: ConversationSidebarProps) {
+export function ConversationSidebar({ conversations, loading, tab, onTabChange }: ConversationSidebarProps) {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const selectedConversationId = useChatStore((state) => state.selectedConversationId);
@@ -37,7 +39,6 @@ export function ConversationSidebar({ conversations, loading }: ConversationSide
   const setSearch = useChatStore((state) => state.setSearch);
   const status = useChatStore((state) => state.status);
   const setStatus = useChatStore((state) => state.setStatus);
-  const [tab, setTab] = useState<'conversations' | 'contacts'>('conversations');
   const [creatingContact, setCreatingContact] = useState(false);
   const contactsQuery = useContacts(tab === 'contacts' ? search : '');
 
@@ -81,12 +82,12 @@ export function ConversationSidebar({ conversations, loading }: ConversationSide
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className={cn('grid gap-2', user?.role === 'ADMIN' ? 'grid-cols-3' : 'grid-cols-2')}>
           <Button
             type="button"
             variant={tab === 'conversations' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setTab('conversations')}
+            onClick={() => onTabChange('conversations')}
           >
             <MessageSquareText />
             Conversas
@@ -95,11 +96,22 @@ export function ConversationSidebar({ conversations, loading }: ConversationSide
             type="button"
             variant={tab === 'contacts' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setTab('contacts')}
+            onClick={() => onTabChange('contacts')}
           >
             <UsersRound />
             Contatos
           </Button>
+          {user?.role === 'ADMIN' ? (
+            <Button
+              type="button"
+              variant={tab === 'admin' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => onTabChange('admin')}
+            >
+              <Bot />
+              Admin
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -140,7 +152,8 @@ export function ConversationSidebar({ conversations, loading }: ConversationSide
             )}
           </div>
         </div>
-      ) : (
+      ) : null}
+      {tab === 'contacts' ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <span className="text-xs font-semibold uppercase text-muted-foreground">Lista de contatos</span>
@@ -161,7 +174,7 @@ export function ConversationSidebar({ conversations, loading }: ConversationSide
                     const conversationId = contactConversationMap.get(contact.id);
                     if (conversationId) {
                       selectConversation(conversationId);
-                      setTab('conversations');
+                      onTabChange('conversations');
                     }
                   }}
                 />
@@ -171,7 +184,18 @@ export function ConversationSidebar({ conversations, loading }: ConversationSide
             )}
           </div>
         </div>
-      )}
+      ) : null}
+      {tab === 'admin' ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center px-8 text-center">
+          <div>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Bot className="h-6 w-6" />
+            </div>
+            <p className="mt-3 text-sm font-medium">Painel administrativo</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">Configure o funil ativo na area principal.</p>
+          </div>
+        </div>
+      ) : null}
     </aside>
   );
 }
