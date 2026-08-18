@@ -105,6 +105,7 @@ Depois da ultima etapa, a conversa fica como `OPEN`, recebe uma mensagem interna
 
 Tambem existe acionamento manual no painel lateral do contato pelo botao `Enviar funil`.
 Para alterar o roteiro sem redeploy, acesse a aba `Admin` dentro do CRM e edite o funil ativo.
+Cada etapa pode ter um atraso em segundos antes do envio, inclusive etapas com imagem, audio, video e documento.
 As variaveis `FUNNEL_MESSAGE_1` ate `FUNNEL_MESSAGE_5` continuam servindo como fallback e seed inicial.
 
 Arquivos de imagem, audio, video e PDF anexados ao funil usam o dominio publico da API.

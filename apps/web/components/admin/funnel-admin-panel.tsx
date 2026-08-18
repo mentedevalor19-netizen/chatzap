@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowUp,
   Bot,
+  Clock3,
   FileText,
   FileUp,
   Image as ImageIcon,
@@ -71,6 +72,7 @@ export function FunnelAdminPanel() {
         mediaUrl: step.mediaUrl ?? '',
         mimeType: step.mimeType ?? '',
         fileName: step.fileName ?? '',
+        delaySeconds: step.delaySeconds ?? 0,
       })),
     );
   }, [funnelQuery.data]);
@@ -155,13 +157,21 @@ export function FunnelAdminPanel() {
             mimeType: step.mimeType?.trim() || undefined,
             fileName: step.fileName?.trim() || undefined,
             caption: step.caption?.trim() || undefined,
+            delaySeconds: normalizeDelayInput(step.delaySeconds),
             waitForReply: step.waitForReply,
           })),
         }),
       });
 
       await queryClient.invalidateQueries({ queryKey: ['active-funnel'] });
-      setSteps(saved.steps.map((step) => ({ ...step, body: step.body ?? '', caption: step.caption ?? '' })));
+      setSteps(
+        saved.steps.map((step) => ({
+          ...step,
+          body: step.body ?? '',
+          caption: step.caption ?? '',
+          delaySeconds: step.delaySeconds ?? 0,
+        })),
+      );
       toast.success('Funil salvo.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Nao foi possivel salvar o funil.');
@@ -371,6 +381,20 @@ function FunnelStepEditor({
             />
             Aguardar resposta do cliente
           </label>
+
+          <label className="space-y-1.5">
+            <span className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+              <Clock3 className="h-4 w-4" />
+              Atraso antes de enviar
+            </span>
+            <Input
+              type="number"
+              min={0}
+              max={3600}
+              value={step.delaySeconds ?? 0}
+              onChange={(event) => onChange({ delaySeconds: normalizeDelayInput(event.target.value) })}
+            />
+          </label>
         </div>
 
         <MediaPreview step={step} />
@@ -434,6 +458,7 @@ function blankStep(position: number): EditableFunnelStep {
     mimeType: '',
     fileName: '',
     caption: '',
+    delaySeconds: 0,
     waitForReply: position === 1,
   };
 }
@@ -464,6 +489,16 @@ function typeFromMime(mime: string): FunnelStepType {
   if (mime.startsWith('audio/')) return 'AUDIO';
   if (mime.startsWith('video/')) return 'VIDEO';
   return 'DOCUMENT';
+}
+
+function normalizeDelayInput(value: number | string | null | undefined) {
+  const parsed = typeof value === 'number' ? value : Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  return Math.min(Math.max(Math.trunc(parsed), 0), 3600);
 }
 
 function acceptForType(type: FunnelStepType) {

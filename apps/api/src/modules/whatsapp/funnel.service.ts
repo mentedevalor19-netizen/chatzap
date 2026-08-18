@@ -98,6 +98,7 @@ export class FunnelService {
             mimeType: this.optionalString(step.mimeType),
             fileName: this.optionalString(step.fileName),
             caption: this.optionalString(step.caption),
+            delaySeconds: this.normalizeDelay(step.delaySeconds),
             waitForReply: step.waitForReply,
           })),
         });
@@ -129,7 +130,16 @@ export class FunnelService {
       throw new NotFoundException('Conversation not found');
     }
 
-    return this.startNewRun(conversation, user.id);
+    const { run, funnel } = await this.createRun(conversation);
+
+    void this.processRun(run, conversation, funnel, user.id).catch((error) => {
+      this.logger.error(
+        `Failed to run manual funnel for conversation ${conversationId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    });
+
+    return { started: true, runId: run.id };
   }
 
   async startAfterFirstInbound(conversationId: string) {
@@ -193,6 +203,11 @@ export class FunnelService {
   }
 
   private async startNewRun(conversation: FunnelConversation, senderUserId?: string) {
+    const { run, funnel } = await this.createRun(conversation);
+    return this.processRun(run, conversation, funnel, senderUserId);
+  }
+
+  private async createRun(conversation: FunnelConversation) {
     const funnel = await this.findActiveFunnel(conversation.organizationId);
 
     if (!funnel) {
@@ -221,7 +236,7 @@ export class FunnelService {
       },
     });
 
-    return this.processRun(run, conversation, funnel, senderUserId);
+    return { run, funnel };
   }
 
   private async continueRun(run: OpenFunnelRun, conversation: FunnelConversation) {
@@ -251,6 +266,17 @@ export class FunnelService {
     }
 
     for (const step of pendingSteps) {
+      const shouldContinue = await this.waitBeforeStep({
+        organizationId: conversation.organizationId,
+        conversationId: conversation.id,
+        runId: run.id,
+        delaySeconds: step.delaySeconds,
+      });
+
+      if (!shouldContinue) {
+        return { sent, assignedToId: conversation.assignedToId, awaitingReply: false };
+      }
+
       const savedMessage = await this.sendAndPersistStep({
         organizationId: conversation.organizationId,
         conversationId: conversation.id,
@@ -333,6 +359,7 @@ export class FunnelService {
           funnelId: options.step.funnelId,
           stepId: options.step.id,
           step: options.step.position,
+          delaySeconds: options.step.delaySeconds,
         } as Prisma.InputJsonValue,
       },
     });
@@ -359,6 +386,7 @@ export class FunnelService {
             funnelId: options.step.funnelId,
             stepId: options.step.id,
             step: options.step.position,
+            delaySeconds: options.step.delaySeconds,
             error: error instanceof Error ? error.message : 'Unknown funnel send error',
           },
         },
@@ -595,6 +623,7 @@ export class FunnelService {
             position: index + 1,
             type: FunnelStepType.TEXT,
             body,
+            delaySeconds: 0,
             waitForReply: index === 0,
           })),
         },
@@ -622,6 +651,8 @@ export class FunnelService {
   }
 
   private validateFunnelStep(step: UpsertFunnelStepDto) {
+    this.normalizeDelay(step.delaySeconds);
+
     if (step.type === FunnelStepType.TEXT && !step.body?.trim()) {
       throw new BadRequestException('Text funnel step requires a message');
     }
@@ -676,6 +707,57 @@ export class FunnelService {
     if (user.role !== UserRole.ADMIN) {
       throw new ForbiddenException('Only admins can manage funnels');
     }
+  }
+
+  private async waitBeforeStep(options: {
+    organizationId: string;
+    conversationId: string;
+    runId: string;
+    delaySeconds: number;
+  }) {
+    const delaySeconds = this.normalizeDelay(options.delaySeconds);
+
+    if (delaySeconds === 0) {
+      return true;
+    }
+
+    this.realtime.emitToConversation(options.organizationId, options.conversationId, 'typing.start', {
+      conversationId: options.conversationId,
+      automation: 'FUNNEL',
+      delaySeconds,
+    });
+
+    await this.sleep(delaySeconds * 1000);
+
+    this.realtime.emitToConversation(options.organizationId, options.conversationId, 'typing.stop', {
+      conversationId: options.conversationId,
+      automation: 'FUNNEL',
+    });
+
+    const run = await this.prisma.conversationFunnelRun.findUnique({
+      where: { id: options.runId },
+      select: { status: true },
+    });
+
+    return run?.status === FunnelRunStatus.RUNNING;
+  }
+
+  private normalizeDelay(delaySeconds?: number | null) {
+    if (!delaySeconds) {
+      return 0;
+    }
+
+    if (!Number.isInteger(delaySeconds) || delaySeconds < 0 || delaySeconds > 3600) {
+      throw new BadRequestException('Funnel step delay must be between 0 and 3600 seconds');
+    }
+
+    return delaySeconds;
+  }
+
+  private sleep(milliseconds: number) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, milliseconds);
+    });
   }
 
   private optionalString(value?: string | null) {

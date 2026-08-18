@@ -36,12 +36,18 @@ export class WhatsappWebhookService {
       }
 
       const contacts = change.value?.contacts ?? [];
+      const statuses = change.value?.statuses ?? [];
+      const messages = change.value?.messages ?? [];
 
-      for (const status of change.value?.statuses ?? []) {
+      this.logger.log(
+        `WhatsApp webhook received ${messages.length} message(s) and ${statuses.length} status update(s)`,
+      );
+
+      for (const status of statuses) {
         await this.handleStatus(organizationId, status);
       }
 
-      for (const message of change.value?.messages ?? []) {
+      for (const message of messages) {
         const profile = contacts.find((contact) => contact.wa_id === message.from);
         await this.handleInboundMessage(organizationId, message, profile?.profile?.name);
       }
@@ -141,6 +147,10 @@ export class WhatsappWebhookService {
 
     void this.whatsapp.markIncomingAsRead(message.id).catch(() => undefined);
     void this.funnel.startAfterFirstInbound(conversation.id);
+
+    this.logger.log(
+      `Inbound WhatsApp message ${message.id} from ${message.from} saved in conversation ${conversation.id}`,
+    );
   }
 
   private async handleStatus(organizationId: string, status: WhatsappStatusUpdate) {
@@ -275,7 +285,18 @@ export class WhatsappWebhookService {
     const configuredId = this.config.get<string>('DEFAULT_ORGANIZATION_ID');
 
     if (configuredId) {
-      return configuredId;
+      const organization = await this.prisma.organization.findUnique({
+        where: { id: configuredId },
+        select: { id: true },
+      });
+
+      if (organization) {
+        return organization.id;
+      }
+
+      this.logger.warn(
+        `DEFAULT_ORGANIZATION_ID=${configuredId} was not found; falling back to first organization`,
+      );
     }
 
     const organization = await this.prisma.organization.findFirst({

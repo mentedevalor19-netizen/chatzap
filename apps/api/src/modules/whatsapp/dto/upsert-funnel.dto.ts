@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -43,6 +44,12 @@ export class UpsertFunnelStepDto {
   @IsOptional()
   @IsString()
   caption?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(3600)
+  delaySeconds?: number;
 
   @IsBoolean()
   waitForReply!: boolean;

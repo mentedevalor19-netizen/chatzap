@@ -57,7 +57,7 @@ Os modelos estão em `apps/api/prisma/schema.prisma`.
 - `ContactTag`: relacionamento muitos-para-muitos entre contatos e tags.
 - `Note`: notas internas do contato.
 - `Funnel`: funil ativo por organização.
-- `FunnelStep`: etapas ordenadas com texto, imagem, áudio, vídeo ou documento.
+- `FunnelStep`: etapas ordenadas com texto, imagem, áudio, vídeo, documento, pausa por resposta e atraso antes do envio.
 - `ConversationFunnelRun`: estado de execução do funil em cada conversa.
 
 As migrations estão em `apps/api/prisma/migrations`.
@@ -131,7 +131,7 @@ Base local: `http://localhost:4000/api/v1`
   - preview de upload;
   - painel lateral com dados, tags, notas e status.
   - botão manual para enviar o funil inicial e iniciar o handoff humano.
-  - aba `Admin` para configurar o funil ativo com texto, imagem, áudio, vídeo e documento.
+  - aba `Admin` para configurar o funil ativo com texto, imagem, áudio, vídeo, documento e delays por etapa.
 
 ## 6. Componentes Reutilizáveis
 
@@ -242,7 +242,7 @@ URLs locais:
 4. Conversas: receber primeira mensagem via webhook e conferir criação automática.
 5. Realtime: abrir duas abas e validar eventos Socket.IO.
 6. Envio texto: configurar credenciais Meta e enviar mensagem outbound.
-7. Funil: configurar etapas na aba `Admin`, marcar a pergunta para aguardar resposta e testar a continuação com qualquer resposta do cliente.
+7. Funil: configurar etapas na aba `Admin`, definir delays em segundos, marcar a pergunta para aguardar resposta e testar a continuação com qualquer resposta do cliente.
 8. Mídias: testar upload local, depois troca para upload direto na Cloud API ou storage público.
 9. Status: validar webhooks `sent`, `delivered`, `read` e `failed`.
 10. Busca: validar pesquisa por nome, telefone e conteúdo.

@@ -107,6 +107,7 @@ export interface FunnelStepSummary {
   mimeType?: string | null;
   fileName?: string | null;
   caption?: string | null;
+  delaySeconds: number;
   waitForReply: boolean;
 }
 

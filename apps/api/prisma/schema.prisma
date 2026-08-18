@@ -258,6 +258,7 @@ model FunnelStep {
   mimeType       String?        @map("mime_type")
   fileName       String?        @map("file_name")
   caption        String?
+  delaySeconds   Int            @default(0) @map("delay_seconds")
   waitForReply   Boolean        @default(false) @map("wait_for_reply")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
