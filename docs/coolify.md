@@ -55,6 +55,16 @@ WHATSAPP_PHONE_NUMBER_ID=id-do-numero
 WHATSAPP_BUSINESS_ACCOUNT_ID=id-da-waba
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=um-token-secreto-para-validacao
 
+META_CAPI_ENABLED=false
+META_DATASET_ID=id-do-dataset-do-events-manager
+META_CAPI_ACCESS_TOKEN=token-do-usuario-de-sistema
+META_CAPI_ENCRYPTION_KEY=uma-chave-longa-para-criptografar-o-token
+META_CAPI_GRAPH_API_VERSION=v20.0
+META_TEST_EVENT_CODE=
+META_CAPI_CURRENCY=BRL
+META_CAPI_SEND_LEAD_EVENTS=false
+META_CAPI_SEND_PURCHASE_EVENTS=true
+
 FUNNEL_ENABLED=true
 FUNNEL_ASSIGN_TO_HUMAN=true
 FUNNEL_MESSAGE_1=Ola! Recebemos sua mensagem. Para agilizar, responda com uma opcao: 1 - Comercial, 2 - Suporte, 3 - Financeiro.
@@ -111,6 +121,23 @@ As variaveis `FUNNEL_MESSAGE_1` ate `FUNNEL_MESSAGE_5` continuam servindo como f
 
 Arquivos de imagem, audio, video e PDF anexados ao funil usam o dominio publico da API.
 Em producao, mantenha `PUBLIC_API_URL` apontando para `https://api-crm.seudominio.com`, porque a Meta precisa acessar essa URL para enviar midias pela Cloud API.
+
+## Meta Ads e Conversions API
+
+A aba `Admin > Meta Ads` permite configurar a Conversions API sem novo deploy.
+Preencha:
+
+- Dataset ID do Events Manager.
+- WhatsApp Business Account ID.
+- Token de usuario de sistema com acesso ao dataset.
+- Test Event Code, apenas durante validacao.
+
+Quando um lead vem de anuncio Click-to-WhatsApp, o webhook salva o `ctwa_clid` da mensagem.
+Quando uma venda vinculada ao contato/conversa fica como `Paga`, a API envia um evento `Purchase` para a Meta.
+Se faltar token, dataset, WABA ID ou `ctwa_clid`, o CRM registra o evento como `Ignorado` com o motivo na aba `Meta Ads`.
+
+O token salvo pelo painel fica criptografado no banco usando `META_CAPI_ENCRYPTION_KEY`.
+Se essa variavel estiver vazia, a API usa `JWT_SECRET` como fallback; em producao, prefira definir uma chave propria e manter o valor fixo.
 
 ## Observacoes importantes
 

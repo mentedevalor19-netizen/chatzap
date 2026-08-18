@@ -60,6 +60,27 @@ enum FunnelRunStatus {
   CANCELLED
 }
 
+enum SaleStatus {
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+enum ExpenseCategory {
+  ADS
+  SUPPLIER
+  TOOLS
+  OTHER
+}
+
+enum MetaConversionStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
 model Organization {
   id        String   @id @default(cuid())
   name      String
@@ -75,6 +96,12 @@ model Organization {
   funnels      Funnel[]
   funnelSteps  FunnelStep[]
   funnelRuns   ConversationFunnelRun[]
+  quickReplies QuickReply[]
+  sales        Sale[]
+  expenses     Expense[]
+  metaSettings MetaIntegrationSetting?
+  adAttributions AdAttribution[]
+  metaConversionEvents MetaConversionEvent[]
 
   @@map("organizations")
 }
@@ -86,6 +113,7 @@ model User {
   name           String
   passwordHash   String   @map("password_hash")
   role           UserRole @default(AGENT)
+  isActive       Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -93,8 +121,11 @@ model User {
   messages              Message[]
   notes                 Note[]
   assignedConversations Conversation[] @relation("AssignedConversations")
+  sales                 Sale[]         @relation("SellerSales")
+  expensesCreated       Expense[]      @relation("ExpenseCreator")
 
   @@index([organizationId])
+  @@index([organizationId, isActive])
   @@map("users")
 }
 
@@ -115,6 +146,9 @@ model Contact {
   messages      Message[]
   tags          ContactTag[]
   notes         Note[]
+  sales         Sale[]
+  adAttributions AdAttribution[]
+  metaConversionEvents MetaConversionEvent[]
 
   @@unique([organizationId, waId])
   @@index([organizationId, phone])
@@ -138,6 +172,9 @@ model Conversation {
   assignedTo   User?        @relation("AssignedConversations", fields: [assignedToId], references: [id], onDelete: SetNull)
   messages     Message[]
   funnelRuns   ConversationFunnelRun[]
+  sales        Sale[]
+  adAttributions AdAttribution[]
+  metaConversionEvents MetaConversionEvent[]
 
   @@index([organizationId, status, lastMessageAt])
   @@index([organizationId, contactId])
@@ -292,4 +329,146 @@ model ConversationFunnelRun {
   @@index([organizationId, status])
   @@index([organizationId, conversationId, status])
   @@map("conversation_funnel_runs")
+}
+
+model QuickReply {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  shortcut       String
+  body           String
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, shortcut])
+  @@index([organizationId, shortcut])
+  @@map("quick_replies")
+}
+
+model Sale {
+  id             String     @id @default(cuid())
+  organizationId String     @map("organization_id")
+  sellerId       String?    @map("seller_id")
+  contactId      String?    @map("contact_id")
+  conversationId String?    @map("conversation_id")
+  title          String
+  amount         Decimal    @db.Decimal(12, 2)
+  status         SaleStatus @default(PAID)
+  note           String?
+  soldAt         DateTime   @default(now()) @map("sold_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  seller       User?         @relation("SellerSales", fields: [sellerId], references: [id], onDelete: SetNull)
+  contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  metaConversionEvents MetaConversionEvent[]
+
+  @@index([organizationId, soldAt])
+  @@index([organizationId, sellerId, soldAt])
+  @@index([organizationId, status, soldAt])
+  @@map("sales")
+}
+
+model Expense {
+  id             String          @id @default(cuid())
+  organizationId String          @map("organization_id")
+  createdById    String?         @map("created_by_id")
+  category       ExpenseCategory @default(OTHER)
+  description    String
+  amount         Decimal         @db.Decimal(12, 2)
+  spentAt        DateTime        @default(now()) @map("spent_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("ExpenseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, spentAt])
+  @@index([organizationId, category, spentAt])
+  @@map("expenses")
+}
+
+model MetaIntegrationSetting {
+  id                        String   @id @default(cuid())
+  organizationId            String   @unique @map("organization_id")
+  isEnabled                 Boolean  @default(false) @map("is_enabled")
+  datasetId                 String?  @map("dataset_id")
+  whatsappBusinessAccountId String?  @map("whatsapp_business_account_id")
+  graphApiVersion           String?  @map("graph_api_version")
+  accessTokenEncrypted      String?  @map("access_token_encrypted")
+  testEventCode             String?  @map("test_event_code")
+  currency                  String   @default("BRL")
+  sendLeadEvents            Boolean  @default(false) @map("send_lead_events")
+  sendPurchaseEvents        Boolean  @default(true) @map("send_purchase_events")
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("meta_integration_settings")
+}
+
+model AdAttribution {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  contactId      String   @map("contact_id")
+  conversationId String   @map("conversation_id")
+  waMessageId    String?  @map("wa_message_id")
+  ctwaClid       String   @map("ctwa_clid")
+  sourceType     String?  @map("source_type")
+  sourceId       String?  @map("source_id")
+  sourceUrl      String?  @map("source_url")
+  headline       String?
+  body           String?
+  mediaType      String?  @map("media_type")
+  imageUrl       String?  @map("image_url")
+  videoUrl       String?  @map("video_url")
+  thumbnailUrl   String?  @map("thumbnail_url")
+  welcomeMessage String?  @map("welcome_message")
+  rawPayload     Json?    @map("raw_payload")
+  receivedAt     DateTime @default(now()) @map("received_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact              Contact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  conversation         Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  metaConversionEvents MetaConversionEvent[]
+
+  @@unique([organizationId, conversationId])
+  @@index([organizationId, contactId, receivedAt])
+  @@index([organizationId, ctwaClid])
+  @@map("ad_attributions")
+}
+
+model MetaConversionEvent {
+  id              String               @id @default(cuid())
+  organizationId  String               @map("organization_id")
+  saleId          String?              @map("sale_id")
+  attributionId   String?              @map("attribution_id")
+  contactId       String?              @map("contact_id")
+  conversationId  String?              @map("conversation_id")
+  eventName       String               @map("event_name")
+  eventId         String               @unique @map("event_id")
+  status          MetaConversionStatus @default(PENDING)
+  requestPayload  Json?                @map("request_payload")
+  responsePayload Json?                @map("response_payload")
+  errorMessage    String?              @map("error_message")
+  sentAt          DateTime?            @map("sent_at")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sale         Sale?          @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  attribution  AdAttribution? @relation(fields: [attributionId], references: [id], onDelete: SetNull)
+  contact      Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  conversation Conversation?  @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, saleId])
+  @@index([organizationId, attributionId])
+  @@map("meta_conversion_events")
 }

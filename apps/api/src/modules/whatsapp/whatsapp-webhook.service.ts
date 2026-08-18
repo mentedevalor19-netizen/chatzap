@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MessageStatus, MessageType, Prisma } from '@prisma/client';
+import { MetaConversionsService } from '../meta/meta-conversions.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { FunnelService } from './funnel.service';
@@ -20,6 +21,7 @@ export class WhatsappWebhookService {
     private readonly realtime: RealtimeGateway,
     private readonly whatsapp: WhatsappService,
     private readonly funnel: FunnelService,
+    private readonly metaConversions: MetaConversionsService,
     private readonly config: ConfigService,
   ) {}
 
@@ -106,10 +108,30 @@ export class WhatsappWebhookService {
       }));
 
     const data = await this.mapInboundMessage(organizationId, conversation.id, contact.id, message);
+    const receivedAt = this.fromUnixTimestamp(message.timestamp) ?? new Date();
 
     const savedMessage = await this.prisma.message.create({
       data,
     });
+
+    if (message.referral?.ctwa_clid) {
+      await this.metaConversions
+        .recordAttribution({
+          organizationId,
+          contactId: contact.id,
+          conversationId: conversation.id,
+          waMessageId: message.id,
+          referral: message.referral as Record<string, unknown>,
+          receivedAt,
+        })
+        .catch((error) => {
+          this.logger.warn(
+            `Could not store CTWA attribution for message ${message.id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        });
+    }
 
     const updatedConversation = await this.prisma.conversation.update({
       where: { id: conversation.id },

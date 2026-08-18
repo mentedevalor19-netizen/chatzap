@@ -1,7 +1,7 @@
 'use client';
 
-import { ChangeEvent, DragEvent, KeyboardEvent, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { ChangeEvent, DragEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileUp, Paperclip, SendHorizontal, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { apiFetch } from '@/lib/api';
 import { emitTyping } from '@/lib/socket';
+import type { QuickReplySummary } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 interface UploadResponse {
@@ -19,12 +20,44 @@ interface UploadResponse {
 
 export function MessageComposer({ conversationId }: { conversationId: string }) {
   const queryClient = useQueryClient();
+  const quickRepliesQuery = useQuery({
+    queryKey: ['quick-replies'],
+    queryFn: () => apiFetch<QuickReplySummary[]>('/quick-replies'),
+    staleTime: 60_000,
+  });
   const [text, setText] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [sending, setSending] = useState(false);
+  const [quickReplyIndex, setQuickReplyIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const quickReplies = quickRepliesQuery.data ?? [];
+  const quickReplyQuery = getQuickReplyQuery(text);
+  const quickReplySuggestions = useMemo(() => {
+    if (quickReplyQuery === null) {
+      return [];
+    }
+
+    return quickReplies
+      .filter((quickReply) => {
+        if (!quickReplyQuery) {
+          return true;
+        }
+
+        return (
+          quickReply.shortcut.toLowerCase().startsWith(quickReplyQuery) ||
+          quickReply.body.toLowerCase().includes(quickReplyQuery)
+        );
+      })
+      .slice(0, 6);
+  }, [quickReplies, quickReplyQuery]);
+  const showQuickReplies = quickReplySuggestions.length > 0;
+
+  useEffect(() => {
+    setQuickReplyIndex(0);
+  }, [quickReplyQuery, quickReplySuggestions.length]);
 
   async function sendMessage() {
     if (!text.trim() && !file) return;
@@ -71,9 +104,20 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
   }
 
   function handleTextChange(value: string) {
-    setText(value);
-    emitTyping('typing.start', conversationId);
+    const completedShortcut = getCompletedQuickReplyCommand(value);
+    const directReply = completedShortcut ? findQuickReply(quickReplies, completedShortcut) : undefined;
 
+    if (directReply) {
+      applyQuickReply(directReply);
+      return;
+    }
+
+    setText(value);
+    startTyping();
+  }
+
+  function startTyping() {
+    emitTyping('typing.start', conversationId);
     if (typingTimer.current) {
       clearTimeout(typingTimer.current);
     }
@@ -83,7 +127,33 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
     }, 1200);
   }
 
+  function applyQuickReply(quickReply: QuickReplySummary) {
+    setText(quickReply.body);
+    startTyping();
+    window.setTimeout(() => textareaRef.current?.focus(), 0);
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (showQuickReplies) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setQuickReplyIndex((current) => (current + 1) % quickReplySuggestions.length);
+        return;
+      }
+
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setQuickReplyIndex((current) => (current - 1 + quickReplySuggestions.length) % quickReplySuggestions.length);
+        return;
+      }
+
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault();
+        applyQuickReply(quickReplySuggestions[quickReplyIndex] ?? quickReplySuggestions[0]);
+        return;
+      }
+    }
+
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       void sendMessage();
@@ -129,6 +199,30 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
         </div>
       ) : null}
 
+      {showQuickReplies ? (
+        <div className="mb-2 overflow-hidden rounded-md border border-border bg-card shadow-soft">
+          {quickReplySuggestions.map((quickReply, index) => (
+            <button
+              key={quickReply.id}
+              type="button"
+              className={cn(
+                'grid w-full grid-cols-[max-content_minmax(0,1fr)] items-center gap-3 px-3 py-2 text-left transition-colors',
+                index === quickReplyIndex ? 'bg-primary/10' : 'hover:bg-muted',
+              )}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                applyQuickReply(quickReply);
+              }}
+            >
+              <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                /{quickReply.shortcut}
+              </span>
+              <span className="min-w-0 truncate text-sm text-foreground">{quickReply.body}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-[40px_minmax(0,1fr)_40px] items-end gap-2">
         <input ref={inputRef} type="file" className="hidden" onChange={handleFileChange} />
         <Tooltip>
@@ -146,6 +240,7 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
           <TooltipContent>Anexar arquivo</TooltipContent>
         </Tooltip>
         <Textarea
+          ref={textareaRef}
           value={text}
           onChange={(event) => handleTextChange(event.target.value)}
           onKeyDown={handleKeyDown}
@@ -170,6 +265,20 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
       </div>
     </div>
   );
+}
+
+function getQuickReplyQuery(value: string) {
+  const match = value.match(/^\/([a-z0-9_-]*)$/i);
+  return match ? match[1].toLowerCase() : null;
+}
+
+function getCompletedQuickReplyCommand(value: string) {
+  const match = value.match(/^\/([a-z0-9_-]+)\s$/i);
+  return match ? match[1].toLowerCase() : null;
+}
+
+function findQuickReply(quickReplies: QuickReplySummary[], shortcut: string) {
+  return quickReplies.find((quickReply) => quickReply.shortcut.toLowerCase() === shortcut);
 }
 
 function typeFromMime(mime: string) {

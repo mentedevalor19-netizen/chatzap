@@ -3,9 +3,19 @@ import type {
   ChatMessage,
   ContactSummary,
   ConversationSummary,
+  CrmMetricsSummary,
+  ExpenseCategory,
+  ExpenseSummary,
   FunnelStepSummary,
   FunnelStepType,
   FunnelSummary,
+  MetaConversionEventSummary,
+  MetaConversionStatus,
+  MetaConversionsSettingsSummary,
+  QuickReplySummary,
+  SaleStatus,
+  SaleSummary,
+  UserSummary,
 } from '@wa-crm/shared';
 
 export type {
@@ -13,9 +23,19 @@ export type {
   ChatMessage,
   ContactSummary,
   ConversationSummary,
+  CrmMetricsSummary,
+  ExpenseCategory,
+  ExpenseSummary,
   FunnelStepSummary,
   FunnelStepType,
   FunnelSummary,
+  MetaConversionEventSummary,
+  MetaConversionStatus,
+  MetaConversionsSettingsSummary,
+  QuickReplySummary,
+  SaleStatus,
+  SaleSummary,
+  UserSummary,
 };
 
 export interface PaginatedMessages {

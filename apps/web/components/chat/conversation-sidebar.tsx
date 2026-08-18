@@ -192,7 +192,7 @@ export function ConversationSidebar({ conversations, loading, tab, onTabChange }
               <Bot className="h-6 w-6" />
             </div>
             <p className="mt-3 text-sm font-medium">Painel administrativo</p>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">Configure o funil ativo na area principal.</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">Gerencie funil, equipe, vendas e financeiro.</p>
           </div>
         </div>
       ) : null}

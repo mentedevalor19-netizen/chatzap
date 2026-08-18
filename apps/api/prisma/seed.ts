@@ -22,12 +22,13 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: adminEmail },
-    update: { passwordHash, organizationId: organization.id, name: adminName, role: UserRole.ADMIN },
+    update: { passwordHash, organizationId: organization.id, name: adminName, role: UserRole.ADMIN, isActive: true },
     create: {
       email: adminEmail,
       name: adminName,
       passwordHash,
       role: UserRole.ADMIN,
+      isActive: true,
       organizationId: organization.id,
     },
   });
@@ -87,6 +88,32 @@ async function main() {
           })),
         },
       },
+    });
+  }
+
+  const quickReplyCount = await prisma.quickReply.count({
+    where: { organizationId: organization.id },
+  });
+
+  if (quickReplyCount === 0) {
+    await prisma.quickReply.createMany({
+      data: [
+        {
+          organizationId: organization.id,
+          shortcut: 'ola',
+          body: 'Ola! Tudo bem? Como posso te ajudar?',
+        },
+        {
+          organizationId: organization.id,
+          shortcut: 'preco',
+          body: 'Claro. Vou te passar as informacoes de valores e condicoes.',
+        },
+        {
+          organizationId: organization.id,
+          shortcut: 'humano',
+          body: 'Vou continuar seu atendimento por aqui. Pode me contar mais detalhes?',
+        },
+      ],
     });
   }
 }

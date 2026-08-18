@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
+  Banknote,
   Bot,
   Clock3,
   FileText,
@@ -11,13 +12,21 @@ import {
   Image as ImageIcon,
   Music,
   Plus,
+  ReceiptText,
   Save,
+  Target,
   Trash2,
+  UsersRound,
   Video,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { FunnelStepSummary, FunnelStepType, FunnelSummary } from '@/lib/types';
+import { FinanceAdminPanel } from '@/components/admin/finance-admin-panel';
+import { MetaConversionsAdminPanel } from '@/components/admin/meta-conversions-admin-panel';
+import { QuickRepliesAdminPanel } from '@/components/admin/quick-replies-admin-panel';
+import { SalesAdminPanel } from '@/components/admin/sales-admin-panel';
+import { TeamAdminPanel } from '@/components/admin/team-admin-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -25,6 +34,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { apiFetch } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 interface UploadResponse {
   fileName: string;
@@ -45,8 +55,49 @@ const stepTypes: Array<{ value: FunnelStepType; label: string }> = [
   { value: 'DOCUMENT', label: 'Documento' },
 ];
 
+type AdminSection = 'automation' | 'team' | 'sales' | 'finance' | 'meta';
+
+const adminSections: Array<{
+  value: AdminSection;
+  label: string;
+  description: string;
+  Icon: typeof Bot;
+}> = [
+  {
+    value: 'automation',
+    label: 'Funil',
+    description: 'Fluxo inicial, delays, midias e respostas rapidas',
+    Icon: Bot,
+  },
+  {
+    value: 'team',
+    label: 'Equipe',
+    description: 'Atendentes e acessos do painel',
+    Icon: UsersRound,
+  },
+  {
+    value: 'sales',
+    label: 'Vendas',
+    description: 'Lancamentos manuais por atendente',
+    Icon: Banknote,
+  },
+  {
+    value: 'finance',
+    label: 'Financeiro',
+    description: 'Gastos, margem e indicadores do CRM',
+    Icon: ReceiptText,
+  },
+  {
+    value: 'meta',
+    label: 'Meta Ads',
+    description: 'Conversoes enviadas para o Gerenciador de Eventos',
+    Icon: Target,
+  },
+];
+
 export function FunnelAdminPanel() {
   const queryClient = useQueryClient();
+  const [adminSection, setAdminSection] = useState<AdminSection>('automation');
   const funnelQuery = useQuery({
     queryKey: ['active-funnel'],
     queryFn: () => apiFetch<FunnelSummary>('/funnels/active'),
@@ -56,6 +107,7 @@ export function FunnelAdminPanel() {
   const [handoffMessage, setHandoffMessage] = useState('Atendimento humano iniciado.');
   const [steps, setSteps] = useState<EditableFunnelStep[]>([]);
   const [saving, setSaving] = useState(false);
+  const currentAdminSection = adminSections.find((section) => section.value === adminSection) ?? adminSections[0];
 
   useEffect(() => {
     if (!funnelQuery.data) return;
@@ -204,80 +256,112 @@ export function FunnelAdminPanel() {
       <header className="flex h-16 items-center justify-between border-b border-border bg-card px-5">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Bot className="h-5 w-5 text-primary" />
-            <h1 className="truncate text-sm font-semibold">Funil de atendimento</h1>
+            <currentAdminSection.Icon className="h-5 w-5 text-primary" />
+            <h1 className="truncate text-sm font-semibold">Administrativo</h1>
           </div>
           <p className="truncate text-xs text-muted-foreground">
-            {waitingStep ? `Pausa apos a etapa ${waitingStep.position}` : 'Sem pausa configurada'}
+            {adminSection === 'automation'
+              ? waitingStep
+                ? `Pausa apos a etapa ${waitingStep.position}`
+                : 'Sem pausa configurada'
+              : currentAdminSection.description}
           </p>
         </div>
-        <Button type="button" size="sm" onClick={() => void saveFunnel()} disabled={saving}>
-          <Save />
-          {saving ? 'Salvando...' : 'Salvar'}
-        </Button>
+        {adminSection === 'automation' ? (
+          <Button type="button" size="sm" onClick={() => void saveFunnel()} disabled={saving}>
+            <Save />
+            {saving ? 'Salvando...' : 'Salvar'}
+          </Button>
+        ) : null}
       </header>
 
+      <div className="grid gap-2 border-b border-border bg-card p-2 sm:grid-cols-2 xl:grid-cols-5">
+        {adminSections.map((section) => (
+          <button
+            key={section.value}
+            type="button"
+            onClick={() => setAdminSection(section.value)}
+            className={cn(
+              'flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-colors',
+              adminSection === section.value ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+            )}
+          >
+            <section.Icon className="h-4 w-4" />
+            {section.label}
+          </button>
+        ))}
+      </div>
+
       <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto">
-        <section className="grid gap-4 border-b border-border p-5 xl:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase text-muted-foreground">Configuracao</p>
-            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nome do funil" />
-            <Textarea
-              value={handoffMessage}
-              onChange={(event) => setHandoffMessage(event.target.value)}
-              rows={3}
-              placeholder="Mensagem interna de handoff"
-            />
-          </div>
-
-          <div className="flex flex-col justify-between rounded-md border border-border bg-card p-4">
-            <label className="flex items-center gap-3 text-sm font-medium">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(event) => setIsActive(event.target.checked)}
-                className="h-4 w-4 accent-primary"
-              />
-              Funil ativo
-            </label>
-            <Separator className="my-4" />
-            <div className="space-y-1">
-              <p className="text-2xl font-semibold">{steps.length}</p>
-              <p className="text-xs text-muted-foreground">etapas configuradas</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-3 p-5">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase text-muted-foreground">Etapas</p>
-            <Button type="button" variant="secondary" size="sm" onClick={addStep}>
-              <Plus />
-              Adicionar
-            </Button>
-          </div>
-
-          {steps.length ? (
-            <div className="space-y-3">
-              {steps.map((step, index) => (
-                <FunnelStepEditor
-                  key={step.id}
-                  step={step}
-                  first={index === 0}
-                  last={index === steps.length - 1}
-                  onChange={(patch) => updateStep(step.id, patch)}
-                  onDelete={() => removeStep(step.id)}
-                  onMove={(direction) => moveStep(step.id, direction)}
-                  onUpload={(event) => void uploadStepMedia(step.id, event)}
+        {adminSection === 'automation' ? (
+          <>
+            <section className="grid gap-4 border-b border-border p-5 xl:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Configuracao</p>
+                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nome do funil" />
+                <Textarea
+                  value={handoffMessage}
+                  onChange={(event) => setHandoffMessage(event.target.value)}
+                  rows={3}
+                  placeholder="Mensagem interna de handoff"
                 />
-              ))}
-            </div>
-          ) : (
-            <div className="flex min-h-52 items-center justify-center rounded-md border border-dashed border-border bg-card text-sm text-muted-foreground">
-              Nenhuma etapa configurada.
-            </div>
-          )}
-        </section>
+              </div>
+
+              <div className="flex flex-col justify-between rounded-md border border-border bg-card p-4">
+                <label className="flex items-center gap-3 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={isActive}
+                    onChange={(event) => setIsActive(event.target.checked)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  Funil ativo
+                </label>
+                <Separator className="my-4" />
+                <div className="space-y-1">
+                  <p className="text-2xl font-semibold">{steps.length}</p>
+                  <p className="text-xs text-muted-foreground">etapas configuradas</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-3 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Etapas</p>
+                <Button type="button" variant="secondary" size="sm" onClick={addStep}>
+                  <Plus />
+                  Adicionar
+                </Button>
+              </div>
+
+              {steps.length ? (
+                <div className="space-y-3">
+                  {steps.map((step, index) => (
+                    <FunnelStepEditor
+                      key={step.id}
+                      step={step}
+                      first={index === 0}
+                      last={index === steps.length - 1}
+                      onChange={(patch) => updateStep(step.id, patch)}
+                      onDelete={() => removeStep(step.id)}
+                      onMove={(direction) => moveStep(step.id, direction)}
+                      onUpload={(event) => void uploadStepMedia(step.id, event)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex min-h-52 items-center justify-center rounded-md border border-dashed border-border bg-card text-sm text-muted-foreground">
+                  Nenhuma etapa configurada.
+                </div>
+              )}
+            </section>
+            <QuickRepliesAdminPanel />
+          </>
+        ) : null}
+        {adminSection === 'team' ? <TeamAdminPanel /> : null}
+        {adminSection === 'sales' ? <SalesAdminPanel /> : null}
+        {adminSection === 'finance' ? <FinanceAdminPanel /> : null}
+        {adminSection === 'meta' ? <MetaConversionsAdminPanel /> : null}
       </div>
     </main>
   );

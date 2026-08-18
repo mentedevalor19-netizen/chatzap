@@ -31,6 +31,15 @@ export type MessageStatus = (typeof messageStatuses)[number];
 export const funnelStepTypes = ['TEXT', 'IMAGE', 'VIDEO', 'AUDIO', 'DOCUMENT'] as const;
 export type FunnelStepType = (typeof funnelStepTypes)[number];
 
+export const saleStatuses = ['PENDING', 'PAID', 'CANCELLED', 'REFUNDED'] as const;
+export type SaleStatus = (typeof saleStatuses)[number];
+
+export const expenseCategories = ['ADS', 'SUPPLIER', 'TOOLS', 'OTHER'] as const;
+export type ExpenseCategory = (typeof expenseCategories)[number];
+
+export const metaConversionStatuses = ['PENDING', 'SENT', 'FAILED', 'SKIPPED'] as const;
+export type MetaConversionStatus = (typeof metaConversionStatuses)[number];
+
 export type RealtimeEvent =
   | 'conversation.upsert'
   | 'conversation.read'
@@ -118,4 +127,134 @@ export interface FunnelSummary {
   isActive: boolean;
   handoffMessage?: string | null;
   steps: FunnelStepSummary[];
+}
+
+export interface QuickReplySummary {
+  id: string;
+  shortcut: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserSummary {
+  id: string;
+  name: string;
+  email: string;
+  role: 'ADMIN' | 'AGENT';
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaleSummary {
+  id: string;
+  title: string;
+  amount: number;
+  status: SaleStatus;
+  note?: string | null;
+  soldAt: string;
+  createdAt: string;
+  updatedAt: string;
+  seller?: UserSummary | null;
+  contact?: Pick<ContactSummary, 'id' | 'name' | 'phone' | 'waId' | 'avatarUrl'> | null;
+  conversation?: {
+    id: string;
+    status: ConversationStatus;
+  } | null;
+  metaConversionEvents?: Array<{
+    id: string;
+    eventName: string;
+    eventId: string;
+    status: MetaConversionStatus;
+    errorMessage?: string | null;
+    sentAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+}
+
+export interface ExpenseSummary {
+  id: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  spentAt: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: UserSummary | null;
+}
+
+export interface CrmMetricsSummary {
+  revenue: number;
+  expenses: number;
+  profit: number;
+  marginPercent: number;
+  salesCount: number;
+  pendingSalesCount: number;
+  averageTicket: number;
+  expenseCount: number;
+  contactsCount: number;
+  conversations: {
+    open: number;
+    pending: number;
+    closed: number;
+    total: number;
+  };
+  salesBySeller: Array<{
+    sellerId: string | null;
+    seller: UserSummary | null;
+    revenue: number;
+    salesCount: number;
+  }>;
+  expensesByCategory: Array<{
+    category: ExpenseCategory;
+    amount: number;
+    count: number;
+  }>;
+}
+
+export interface MetaConversionsSettingsSummary {
+  id: string | null;
+  isEnabled: boolean;
+  datasetId: string | null;
+  whatsappBusinessAccountId: string | null;
+  graphApiVersion: string;
+  testEventCode: string | null;
+  currency: string;
+  sendLeadEvents: boolean;
+  sendPurchaseEvents: boolean;
+  hasAccessToken: boolean;
+  usingEnvAccessToken: boolean;
+}
+
+export interface MetaConversionEventSummary {
+  id: string;
+  saleId?: string | null;
+  attributionId?: string | null;
+  contactId?: string | null;
+  conversationId?: string | null;
+  eventName: string;
+  eventId: string;
+  status: MetaConversionStatus;
+  errorMessage?: string | null;
+  sentAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  sale?: {
+    id: string;
+    title: string;
+    amount: number;
+    status: SaleStatus;
+    soldAt: string;
+  } | null;
+  contact?: Pick<ContactSummary, 'id' | 'name' | 'phone' | 'waId' | 'avatarUrl'> | null;
+  attribution?: {
+    id: string;
+    ctwaClid: string;
+    sourceId?: string | null;
+    sourceUrl?: string | null;
+    headline?: string | null;
+    receivedAt: string;
+  } | null;
 }

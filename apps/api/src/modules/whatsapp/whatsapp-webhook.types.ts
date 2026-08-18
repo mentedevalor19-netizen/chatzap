@@ -45,6 +45,7 @@ export interface WhatsappInboundMessage {
     address?: string;
   };
   contacts?: unknown[];
+  referral?: WhatsappReferralPayload;
 }
 
 export interface WhatsappMediaPayload {
@@ -60,4 +61,20 @@ export interface WhatsappStatusUpdate {
   timestamp?: string;
   recipient_id?: string;
   errors?: unknown[];
+}
+
+export interface WhatsappReferralPayload {
+  source_url?: string;
+  source_id?: string;
+  source_type?: string;
+  headline?: string;
+  body?: string;
+  media_type?: string;
+  image_url?: string;
+  video_url?: string;
+  thumbnail_url?: string;
+  ctwa_clid?: string;
+  welcome_message?: {
+    text?: string;
+  };
 }
