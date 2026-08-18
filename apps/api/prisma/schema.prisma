@@ -259,6 +259,7 @@ model FunnelStep {
   fileName       String?        @map("file_name")
   caption        String?
   delaySeconds   Int            @default(0) @map("delay_seconds")
+  audioAsVoice   Boolean        @default(false) @map("audio_as_voice")
   waitForReply   Boolean        @default(false) @map("wait_for_reply")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")

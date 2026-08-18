@@ -108,6 +108,7 @@ export interface FunnelStepSummary {
   fileName?: string | null;
   caption?: string | null;
   delaySeconds: number;
+  audioAsVoice: boolean;
   waitForReply: boolean;
 }
 

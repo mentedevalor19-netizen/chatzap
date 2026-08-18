@@ -51,6 +51,10 @@ export class UpsertFunnelStepDto {
   @Max(3600)
   delaySeconds?: number;
 
+  @IsOptional()
+  @IsBoolean()
+  audioAsVoice?: boolean;
+
   @IsBoolean()
   waitForReply!: boolean;
 }

@@ -82,6 +82,7 @@ async function main() {
             type: FunnelStepType.TEXT,
             body: message,
             delaySeconds: 0,
+            audioAsVoice: false,
             waitForReply: index === 0,
           })),
         },

@@ -13,6 +13,7 @@ interface MediaMessageOptions {
   mediaUrl?: string;
   caption?: string;
   fileName?: string;
+  audioAsVoice?: boolean;
 }
 
 interface TemplateMessageOptions {
@@ -50,6 +51,7 @@ export class WhatsappService {
         ...(options.mediaId ? { id: options.mediaId } : { link: options.mediaUrl }),
         ...(options.caption && field !== 'audio' ? { caption: options.caption } : {}),
         ...(options.fileName && field === 'document' ? { filename: options.fileName } : {}),
+        ...(options.audioAsVoice && field === 'audio' ? { voice: true } : {}),
       },
     };
 

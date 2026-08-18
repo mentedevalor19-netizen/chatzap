@@ -73,6 +73,7 @@ export function FunnelAdminPanel() {
         mimeType: step.mimeType ?? '',
         fileName: step.fileName ?? '',
         delaySeconds: step.delaySeconds ?? 0,
+        audioAsVoice: step.audioAsVoice ?? false,
       })),
     );
   }, [funnelQuery.data]);
@@ -120,16 +121,19 @@ export function FunnelAdminPanel() {
     try {
       const form = new FormData();
       form.append('file', file);
-      const upload = await apiFetch<UploadResponse>('/uploads', {
+      const shouldUploadAsVoice = file.type.startsWith('audio/');
+      const upload = await apiFetch<UploadResponse>(shouldUploadAsVoice ? '/uploads?voice=true' : '/uploads', {
         method: 'POST',
         body: form,
       });
+      const uploadedType = typeFromMime(upload.mimeType);
 
       updateStep(stepId, {
-        type: typeFromMime(upload.mimeType),
+        type: uploadedType,
         mediaUrl: upload.mediaUrl,
         mimeType: upload.mimeType,
         fileName: upload.fileName,
+        audioAsVoice: uploadedType === 'AUDIO',
         uploading: false,
       });
       toast.success('Arquivo anexado ao funil.');
@@ -158,6 +162,7 @@ export function FunnelAdminPanel() {
             fileName: step.fileName?.trim() || undefined,
             caption: step.caption?.trim() || undefined,
             delaySeconds: normalizeDelayInput(step.delaySeconds),
+            audioAsVoice: step.type === 'AUDIO' ? Boolean(step.audioAsVoice) : false,
             waitForReply: step.waitForReply,
           })),
         }),
@@ -170,6 +175,7 @@ export function FunnelAdminPanel() {
           body: step.body ?? '',
           caption: step.caption ?? '',
           delaySeconds: step.delaySeconds ?? 0,
+          audioAsVoice: step.audioAsVoice ?? false,
         })),
       );
       toast.success('Funil salvo.');
@@ -382,6 +388,18 @@ function FunnelStepEditor({
             Aguardar resposta do cliente
           </label>
 
+          {step.type === 'AUDIO' ? (
+            <label className="flex items-center gap-3 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={Boolean(step.audioAsVoice)}
+                onChange={(event) => onChange({ audioAsVoice: event.target.checked })}
+                className="h-4 w-4 accent-primary"
+              />
+              Nota de voz
+            </label>
+          ) : null}
+
           <label className="space-y-1.5">
             <span className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
               <Clock3 className="h-4 w-4" />
@@ -459,6 +477,7 @@ function blankStep(position: number): EditableFunnelStep {
     fileName: '',
     caption: '',
     delaySeconds: 0,
+    audioAsVoice: false,
     waitForReply: position === 1,
   };
 }
@@ -472,6 +491,7 @@ function normalizeStep(step: EditableFunnelStep): EditableFunnelStep {
       mimeType: '',
       fileName: '',
       caption: '',
+      audioAsVoice: false,
     };
   }
 

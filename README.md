@@ -57,7 +57,7 @@ Os modelos estão em `apps/api/prisma/schema.prisma`.
 - `ContactTag`: relacionamento muitos-para-muitos entre contatos e tags.
 - `Note`: notas internas do contato.
 - `Funnel`: funil ativo por organização.
-- `FunnelStep`: etapas ordenadas com texto, imagem, áudio, vídeo, documento, pausa por resposta e atraso antes do envio.
+- `FunnelStep`: etapas ordenadas com texto, imagem, áudio, vídeo, documento, pausa por resposta, atraso antes do envio e áudio como nota de voz.
 - `ConversationFunnelRun`: estado de execução do funil em cada conversa.
 
 As migrations estão em `apps/api/prisma/migrations`.
@@ -131,7 +131,7 @@ Base local: `http://localhost:4000/api/v1`
   - preview de upload;
   - painel lateral com dados, tags, notas e status.
   - botão manual para enviar o funil inicial e iniciar o handoff humano.
-  - aba `Admin` para configurar o funil ativo com texto, imagem, áudio, vídeo, documento e delays por etapa.
+  - aba `Admin` para configurar o funil ativo com texto, imagem, áudio, vídeo, documento, delays por etapa e áudio como nota de voz.
 
 ## 6. Componentes Reutilizáveis
 

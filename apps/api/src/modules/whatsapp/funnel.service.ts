@@ -99,6 +99,7 @@ export class FunnelService {
             fileName: this.optionalString(step.fileName),
             caption: this.optionalString(step.caption),
             delaySeconds: this.normalizeDelay(step.delaySeconds),
+            audioAsVoice: step.type === FunnelStepType.AUDIO ? Boolean(step.audioAsVoice) : false,
             waitForReply: step.waitForReply,
           })),
         });
@@ -360,6 +361,7 @@ export class FunnelService {
           stepId: options.step.id,
           step: options.step.position,
           delaySeconds: options.step.delaySeconds,
+          audioAsVoice: options.step.audioAsVoice,
         } as Prisma.InputJsonValue,
       },
     });
@@ -387,6 +389,7 @@ export class FunnelService {
             stepId: options.step.id,
             step: options.step.position,
             delaySeconds: options.step.delaySeconds,
+            audioAsVoice: options.step.audioAsVoice,
             error: error instanceof Error ? error.message : 'Unknown funnel send error',
           },
         },
@@ -423,6 +426,7 @@ export class FunnelService {
       mediaUrl: step.mediaUrl ?? undefined,
       caption: step.caption ?? step.body ?? undefined,
       fileName: step.fileName ?? undefined,
+      audioAsVoice: step.type === FunnelStepType.AUDIO && step.audioAsVoice,
     });
   }
 
@@ -624,6 +628,7 @@ export class FunnelService {
             type: FunnelStepType.TEXT,
             body,
             delaySeconds: 0,
+            audioAsVoice: false,
             waitForReply: index === 0,
           })),
         },
@@ -659,6 +664,10 @@ export class FunnelService {
 
     if (step.type !== FunnelStepType.TEXT && !step.mediaId?.trim() && !step.mediaUrl?.trim()) {
       throw new BadRequestException('Media funnel step requires a file or media URL');
+    }
+
+    if (step.type === FunnelStepType.AUDIO && step.audioAsVoice && !this.isProbablyVoiceNote(step)) {
+      throw new BadRequestException('Voice audio funnel step requires an .ogg file encoded with OPUS');
     }
   }
 
@@ -707,6 +716,14 @@ export class FunnelService {
     if (user.role !== UserRole.ADMIN) {
       throw new ForbiddenException('Only admins can manage funnels');
     }
+  }
+
+  private isProbablyVoiceNote(step: UpsertFunnelStepDto) {
+    const mimeType = step.mimeType?.toLowerCase() ?? '';
+    const fileName = step.fileName?.toLowerCase() ?? '';
+    const mediaUrl = step.mediaUrl?.toLowerCase() ?? '';
+
+    return mimeType.includes('audio/ogg') || fileName.endsWith('.ogg') || mediaUrl.includes('.ogg');
   }
 
   private async waitBeforeStep(options: {
