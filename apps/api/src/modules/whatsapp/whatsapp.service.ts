@@ -58,7 +58,10 @@ export class WhatsappService {
     return this.sendMessage(payload);
   }
 
-  async sendLocation(to: string, location: { latitude: number; longitude: number; name?: string; address?: string }) {
+  async sendLocation(
+    to: string,
+    location: { latitude: number; longitude: number; name?: string; address?: string },
+  ) {
     return this.sendMessage({
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -138,6 +141,39 @@ export class WhatsappService {
 
     const data = (await response.json()) as { url?: string; mime_type?: string };
     return data.url ? { url: data.url, mimeType: data.mime_type } : null;
+  }
+
+  getPublicMediaUrl(mediaId: string) {
+    const baseUrl = this.config.get<string>('PUBLIC_API_URL') ?? 'http://localhost:4000';
+    return `${baseUrl}/api/v1/whatsapp/media/${encodeURIComponent(mediaId)}`;
+  }
+
+  async downloadMedia(mediaId: string) {
+    const resolved = await this.resolveMediaUrl(mediaId);
+
+    if (!resolved?.url) {
+      throw new ServiceUnavailableException('WhatsApp media URL could not be resolved');
+    }
+
+    const response = await fetch(resolved.url, {
+      headers: {
+        Authorization: `Bearer ${this.getRequired('WHATSAPP_ACCESS_TOKEN')}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new ServiceUnavailableException(`WhatsApp media download failed: ${errorText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+
+    return {
+      buffer: Buffer.from(arrayBuffer),
+      mimeType:
+        response.headers.get('content-type') ?? resolved.mimeType ?? 'application/octet-stream',
+      contentLength: response.headers.get('content-length'),
+    };
   }
 
   private async sendMessage(payload: Record<string, unknown>) {

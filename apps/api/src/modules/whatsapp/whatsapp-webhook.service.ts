@@ -56,7 +56,11 @@ export class WhatsappWebhookService {
     }
   }
 
-  private async handleInboundMessage(organizationId: string, message: WhatsappInboundMessage, profileName?: string) {
+  private async handleInboundMessage(
+    organizationId: string,
+    message: WhatsappInboundMessage,
+    profileName?: string,
+  ) {
     const existing = await this.prisma.message.findUnique({
       where: { waMessageId: message.id },
       select: { id: true },
@@ -165,7 +169,12 @@ export class WhatsappWebhookService {
       lastMessage: updatedConversation.messages[0] ?? null,
       messages: undefined,
     });
-    this.realtime.emitToConversation(organizationId, conversation.id, 'message.created', savedMessage);
+    this.realtime.emitToConversation(
+      organizationId,
+      conversation.id,
+      'message.created',
+      savedMessage,
+    );
 
     void this.whatsapp.markIncomingAsRead(message.id).catch(() => undefined);
     void this.funnel.startAfterFirstInbound(conversation.id);
@@ -253,16 +262,16 @@ export class WhatsappWebhookService {
       };
     }
 
-    const media = message.image ?? message.video ?? message.audio ?? message.document ?? message.sticker;
+    const media =
+      message.image ?? message.video ?? message.audio ?? message.document ?? message.sticker;
     const type = this.mapInboundType(message.type);
-    const mediaUrl = media?.id ? await this.whatsapp.resolveMediaUrl(media.id).catch(() => null) : null;
 
     return {
       ...base,
       type,
       mediaId: media?.id,
-      mediaUrl: mediaUrl?.url,
-      mimeType: media?.mime_type ?? mediaUrl?.mimeType,
+      mediaUrl: media?.id ? this.whatsapp.getPublicMediaUrl(media.id) : undefined,
+      mimeType: media?.mime_type,
       caption: media?.caption,
       fileName: message.document?.filename,
     };

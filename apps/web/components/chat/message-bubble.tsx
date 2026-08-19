@@ -45,15 +45,25 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
 }
 
 function MessageBody({ message, outbound }: { message: ChatMessage; outbound: boolean }) {
+  const mediaUrl = getPlayableMediaUrl(message);
+
   if (message.type === 'TEXT' || message.type === 'TEMPLATE') {
     return <p className="whitespace-pre-wrap break-words leading-5">{message.body}</p>;
   }
 
   if (message.type === 'IMAGE') {
     return (
-      <MediaShell icon={<ImageIcon />} title={message.caption || message.fileName || 'Imagem'} outbound={outbound}>
-        {message.mediaUrl ? (
-          <img src={message.mediaUrl} alt={message.caption ?? 'Imagem'} className="mt-2 max-h-72 rounded-md object-cover" />
+      <MediaShell
+        icon={<ImageIcon />}
+        title={message.caption || message.fileName || 'Imagem'}
+        outbound={outbound}
+      >
+        {mediaUrl ? (
+          <img
+            src={mediaUrl}
+            alt={message.caption ?? 'Imagem'}
+            className="mt-2 max-h-72 rounded-md object-cover"
+          />
         ) : null}
       </MediaShell>
     );
@@ -61,8 +71,12 @@ function MessageBody({ message, outbound }: { message: ChatMessage; outbound: bo
 
   if (message.type === 'VIDEO') {
     return (
-      <MediaShell icon={<Video />} title={message.caption || message.fileName || 'Video'} outbound={outbound}>
-        {message.mediaUrl ? <video src={message.mediaUrl} controls className="mt-2 max-h-72 rounded-md" /> : null}
+      <MediaShell
+        icon={<Video />}
+        title={message.caption || message.fileName || 'Video'}
+        outbound={outbound}
+      >
+        {mediaUrl ? <video src={mediaUrl} controls className="mt-2 max-h-72 rounded-md" /> : null}
       </MediaShell>
     );
   }
@@ -70,7 +84,7 @@ function MessageBody({ message, outbound }: { message: ChatMessage; outbound: bo
   if (message.type === 'AUDIO') {
     return (
       <MediaShell icon={<Music />} title="Audio" outbound={outbound}>
-        {message.mediaUrl ? <audio src={message.mediaUrl} controls className="mt-2 w-64 max-w-full" /> : null}
+        {mediaUrl ? <audio src={mediaUrl} controls className="mt-2 w-64 max-w-full" /> : null}
       </MediaShell>
     );
   }
@@ -78,17 +92,21 @@ function MessageBody({ message, outbound }: { message: ChatMessage; outbound: bo
   if (message.type === 'DOCUMENT') {
     return (
       <a
-        href={message.mediaUrl ?? '#'}
+        href={mediaUrl ?? '#'}
         download
         className={cn(
           'flex items-center gap-3 rounded-md border p-3 transition-colors',
-          outbound ? 'border-primary-foreground/25 hover:bg-white/10' : 'border-border hover:bg-muted',
+          outbound
+            ? 'border-primary-foreground/25 hover:bg-white/10'
+            : 'border-border hover:bg-muted',
         )}
       >
         <FileText className="h-5 w-5 shrink-0" />
         <span className="min-w-0">
           <span className="block truncate font-medium">{message.fileName ?? 'Documento'}</span>
-          <span className="block truncate text-xs opacity-75">{message.mimeType ?? 'PDF ou arquivo'}</span>
+          <span className="block truncate text-xs opacity-75">
+            {message.mimeType ?? 'PDF ou arquivo'}
+          </span>
         </span>
       </a>
     );
@@ -125,6 +143,14 @@ function MessageBody({ message, outbound }: { message: ChatMessage; outbound: bo
   }
 
   return <p className="text-sm opacity-80">Tipo de mensagem nao suportado.</p>;
+}
+
+function getPlayableMediaUrl(message: ChatMessage) {
+  if (message.direction === 'INBOUND' && message.mediaId) {
+    return `/api/v1/whatsapp/media/${encodeURIComponent(message.mediaId)}`;
+  }
+
+  return message.mediaUrl;
 }
 
 function MediaShell({

@@ -5,12 +5,18 @@ import { FunnelAdminController } from './funnel-admin.controller';
 import { FunnelController } from './funnel.controller';
 import { FunnelService } from './funnel.service';
 import { WhatsappController } from './whatsapp.controller';
+import { WhatsappMediaController } from './whatsapp-media.controller';
 import { WhatsappService } from './whatsapp.service';
 import { WhatsappWebhookService } from './whatsapp-webhook.service';
 
 @Module({
   imports: [RealtimeModule, MetaModule],
-  controllers: [WhatsappController, FunnelController, FunnelAdminController],
+  controllers: [
+    WhatsappController,
+    WhatsappMediaController,
+    FunnelController,
+    FunnelAdminController,
+  ],
   providers: [WhatsappService, WhatsappWebhookService, FunnelService],
   exports: [WhatsappService, FunnelService],
 })

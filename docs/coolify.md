@@ -126,6 +126,7 @@ Assine os eventos de mensagens e status do WhatsApp Business Account.
 ## Funil e handoff humano
 
 Com `FUNNEL_ENABLED=true`, a API envia automaticamente o funil na primeira mensagem recebida de uma conversa nova.
+O disparo automatico considera o historico completo do contato: se o lead ja chamou antes, mesmo em outro dia ou em uma nova conversa, o funil nao dispara novamente.
 Se uma etapa estiver marcada para aguardar resposta, o funil pausa e continua na proxima mensagem recebida, independente do conteudo respondido pelo cliente.
 Depois da ultima etapa, a conversa fica como `OPEN`, recebe uma mensagem interna de handoff e e atribuida ao primeiro usuario `ADMIN` ou `AGENT` da organizacao.
 
@@ -137,6 +138,18 @@ As variaveis `FUNNEL_MESSAGE_1` ate `FUNNEL_MESSAGE_5` continuam servindo como f
 
 Arquivos de imagem, audio, video e PDF anexados ao funil usam o dominio publico da API.
 Em producao, mantenha `PUBLIC_API_URL` apontando para `https://api-crm.seudominio.com`, porque a Meta precisa acessar essa URL para enviar midias pela Cloud API.
+
+## Midias recebidas de clientes
+
+Midias inbound da Cloud API nao podem ser tocadas diretamente pelo navegador, porque a URL temporaria da Meta exige `Authorization: Bearer`.
+O CRM usa um proxy interno em:
+
+```txt
+https://api-crm.seudominio.com/api/v1/whatsapp/media/:mediaId
+```
+
+Esse endpoint resolve a URL temporaria na Meta, baixa com o token configurado em `WHATSAPP_ACCESS_TOKEN` e entrega imagem, audio, video ou documento para o painel.
+Se audio/video/documento nao abrir, confirme que `WHATSAPP_ACCESS_TOKEN` esta valido e que a midia ainda existe na Meta.
 
 ## Meta Ads e Conversions API
 

@@ -11,6 +11,7 @@ export function ContactCreateForm({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -26,7 +27,12 @@ export function ContactCreateForm({ onDone }: { onDone: () => void }) {
     try {
       await apiFetch('/contacts', {
         method: 'POST',
-        body: JSON.stringify({ name, phone: waId, waId }),
+        body: JSON.stringify({
+          name,
+          phone: waId,
+          waId,
+          avatarUrl: avatarUrl.trim() || undefined,
+        }),
       });
       await queryClient.invalidateQueries({ queryKey: ['contacts'] });
       toast.success('Contato criado.');
@@ -41,7 +47,16 @@ export function ContactCreateForm({ onDone }: { onDone: () => void }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-2 border-b border-border p-3">
       <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nome" />
-      <Input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Telefone com DDI" />
+      <Input
+        value={phone}
+        onChange={(event) => setPhone(event.target.value)}
+        placeholder="Telefone com DDI"
+      />
+      <Input
+        value={avatarUrl}
+        onChange={(event) => setAvatarUrl(event.target.value)}
+        placeholder="URL da foto opcional"
+      />
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={saving}>
           Salvar

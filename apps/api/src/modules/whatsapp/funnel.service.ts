@@ -169,9 +169,19 @@ export class FunnelService {
       return;
     }
 
-    const inboundCount = await this.prisma.message.count({
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { contact: true },
+    });
+
+    if (!conversation) {
+      return;
+    }
+
+    const contactInboundCount = await this.prisma.message.count({
       where: {
-        conversationId,
+        organizationId: conversation.organizationId,
+        contactId: conversation.contactId,
         direction: 'INBOUND',
       },
     });
@@ -182,16 +192,7 @@ export class FunnelService {
       },
     });
 
-    if (inboundCount !== 1 || outboundCount > 0) {
-      return;
-    }
-
-    const conversation = await this.prisma.conversation.findUnique({
-      where: { id: conversationId },
-      include: { contact: true },
-    });
-
-    if (!conversation) {
+    if (contactInboundCount !== 1 || outboundCount > 0) {
       return;
     }
 
@@ -316,7 +317,12 @@ export class FunnelService {
     senderUserId?: string,
   ) {
     const assignedToId = await this.assignHuman(conversation);
-    await this.createHandoffMessage(conversation, senderUserId, assignedToId, funnel.handoffMessage);
+    await this.createHandoffMessage(
+      conversation,
+      senderUserId,
+      assignedToId,
+      funnel.handoffMessage,
+    );
     await this.prisma.conversationFunnelRun.update({
       where: { id: runId },
       data: {
@@ -354,7 +360,7 @@ export class FunnelService {
         caption:
           options.step.type === FunnelStepType.TEXT
             ? null
-            : options.step.caption ?? options.step.body,
+            : (options.step.caption ?? options.step.body),
         rawPayload: {
           automation: 'FUNNEL',
           funnelId: options.step.funnelId,
@@ -666,8 +672,14 @@ export class FunnelService {
       throw new BadRequestException('Media funnel step requires a file or media URL');
     }
 
-    if (step.type === FunnelStepType.AUDIO && step.audioAsVoice && !this.isProbablyVoiceNote(step)) {
-      throw new BadRequestException('Voice audio funnel step requires an .ogg file encoded with OPUS');
+    if (
+      step.type === FunnelStepType.AUDIO &&
+      step.audioAsVoice &&
+      !this.isProbablyVoiceNote(step)
+    ) {
+      throw new BadRequestException(
+        'Voice audio funnel step requires an .ogg file encoded with OPUS',
+      );
     }
   }
 
@@ -738,18 +750,28 @@ export class FunnelService {
       return true;
     }
 
-    this.realtime.emitToConversation(options.organizationId, options.conversationId, 'typing.start', {
-      conversationId: options.conversationId,
-      automation: 'FUNNEL',
-      delaySeconds,
-    });
+    this.realtime.emitToConversation(
+      options.organizationId,
+      options.conversationId,
+      'typing.start',
+      {
+        conversationId: options.conversationId,
+        automation: 'FUNNEL',
+        delaySeconds,
+      },
+    );
 
     await this.sleep(delaySeconds * 1000);
 
-    this.realtime.emitToConversation(options.organizationId, options.conversationId, 'typing.stop', {
-      conversationId: options.conversationId,
-      automation: 'FUNNEL',
-    });
+    this.realtime.emitToConversation(
+      options.organizationId,
+      options.conversationId,
+      'typing.stop',
+      {
+        conversationId: options.conversationId,
+        automation: 'FUNNEL',
+      },
+    );
 
     const run = await this.prisma.conversationFunnelRun.findUnique({
       where: { id: options.runId },

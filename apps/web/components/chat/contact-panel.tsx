@@ -1,11 +1,12 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Banknote,
   CheckCircle2,
   Clock3,
+  FileUp,
   Save,
   StickyNote,
   Tag,
@@ -24,6 +25,10 @@ import { apiFetch } from '@/lib/api';
 import { formatCurrency, formatPhone, formatShortDate, initials } from '@/lib/utils';
 import { useChatStore } from '@/stores/chat-store';
 
+interface UploadResponse {
+  mediaUrl: string;
+}
+
 export function ContactPanel({ conversation }: { conversation?: ConversationSummary }) {
   const queryClient = useQueryClient();
   const infoOpen = useChatStore((state) => state.infoOpen);
@@ -31,8 +36,10 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
   const selectConversation = useChatStore((state) => state.selectConversation);
   const [name, setName] = useState(conversation?.contact.name ?? '');
   const [phone, setPhone] = useState(conversation?.contact.phone ?? '');
+  const [avatarUrl, setAvatarUrl] = useState(conversation?.contact.avatarUrl ?? '');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [startingFunnel, setStartingFunnel] = useState(false);
   const [saleProductId, setSaleProductId] = useState('');
   const [saleAmount, setSaleAmount] = useState('');
@@ -57,11 +64,17 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
   useEffect(() => {
     setName(conversation?.contact.name ?? '');
     setPhone(conversation?.contact.phone ?? '');
+    setAvatarUrl(conversation?.contact.avatarUrl ?? '');
     setNote('');
     setSaleProductId('');
     setSaleAmount('');
     setSaleNote('');
-  }, [conversation?.contact.id, conversation?.contact.name, conversation?.contact.phone]);
+  }, [
+    conversation?.contact.avatarUrl,
+    conversation?.contact.id,
+    conversation?.contact.name,
+    conversation?.contact.phone,
+  ]);
 
   if (!conversation) {
     return null;
@@ -83,6 +96,7 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
           name,
           phone: normalizedPhone,
           waId: normalizedPhone,
+          avatarUrl: avatarUrl.trim() || null,
         }),
       });
       await queryClient.invalidateQueries({ queryKey: ['conversations'] });
@@ -129,6 +143,36 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
     await queryClient.invalidateQueries({
       queryKey: ['contact-notes', activeConversation.contact.id],
     });
+  }
+
+  async function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Envie uma imagem valida.');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const upload = await apiFetch<UploadResponse>('/uploads', {
+        method: 'POST',
+        body: form,
+      });
+      setAvatarUrl(upload.mediaUrl);
+      toast.success('Foto anexada. Clique em Salvar para aplicar no lead.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Nao foi possivel enviar a foto.');
+    } finally {
+      setUploadingAvatar(false);
+    }
   }
 
   function selectSaleProduct(productId: string) {
@@ -216,10 +260,7 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
       <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto">
         <section className="flex flex-col items-center px-6 py-6 text-center">
           <Avatar className="h-20 w-20">
-            <AvatarImage
-              src={conversation.contact.avatarUrl ?? undefined}
-              alt={conversation.contact.name}
-            />
+            <AvatarImage src={avatarUrl || undefined} alt={conversation.contact.name} />
             <AvatarFallback className="text-xl">
               {initials(conversation.contact.name)}
             </AvatarFallback>
@@ -242,6 +283,36 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
             onChange={(event) => setPhone(event.target.value)}
             placeholder="Telefone"
           />
+          <div className="grid grid-cols-[minmax(0,1fr)_40px] gap-2">
+            <Input
+              value={avatarUrl}
+              onChange={(event) => setAvatarUrl(event.target.value)}
+              placeholder="URL da foto do lead"
+            />
+            <label className="flex h-10 cursor-pointer items-center justify-center rounded-md border border-input bg-background transition-colors hover:bg-muted">
+              <FileUp className="h-4 w-4 text-primary" />
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => void uploadAvatar(event)}
+              />
+            </label>
+          </div>
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span className="truncate">
+              {uploadingAvatar ? 'Enviando foto...' : 'A foto aparece nas conversas e no perfil.'}
+            </span>
+            {avatarUrl ? (
+              <button
+                type="button"
+                className="font-medium text-destructive"
+                onClick={() => setAvatarUrl('')}
+              >
+                Remover
+              </button>
+            ) : null}
+          </div>
           <Button type="submit" size="sm" className="w-full" disabled={saving}>
             <Save />
             Salvar
