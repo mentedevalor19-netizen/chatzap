@@ -4,14 +4,25 @@ import { FormEvent, useMemo, useState } from 'react';
 import { Banknote, Save, Target, Trash2 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { ContactSummary, SaleStatus, SaleSummary, UserSummary } from '@/lib/types';
+import type {
+  ContactSummary,
+  ProductSummary,
+  SaleStatus,
+  SaleSummary,
+  UserSummary,
+} from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { apiFetch } from '@/lib/api';
 import { formatCurrency, formatPhone, formatShortDate } from '@/lib/utils';
-import { getCurrentMonthRange, metaConversionStatusLabels, saleStatusLabels, toDateInputValue } from './business-admin-utils';
+import {
+  getCurrentMonthRange,
+  metaConversionStatusLabels,
+  saleStatusLabels,
+  toDateInputValue,
+} from './business-admin-utils';
 
 const saleStatuses: SaleStatus[] = ['PAID', 'PENDING', 'CANCELLED', 'REFUNDED'];
 
@@ -25,6 +36,7 @@ export function SalesAdminPanel() {
   const [amount, setAmount] = useState('');
   const [sellerId, setSellerId] = useState('');
   const [contactId, setContactId] = useState('');
+  const [productId, setProductId] = useState('');
   const [status, setStatus] = useState<SaleStatus>('PAID');
   const [soldAt, setSoldAt] = useState(toDateInputValue(new Date()));
   const [note, setNote] = useState('');
@@ -37,6 +49,10 @@ export function SalesAdminPanel() {
   const contactsQuery = useQuery({
     queryKey: ['contacts', 'sales-admin'],
     queryFn: () => apiFetch<ContactSummary[]>('/contacts'),
+  });
+  const productsQuery = useQuery({
+    queryKey: ['products', 'active'],
+    queryFn: () => apiFetch<ProductSummary[]>('/products?activeOnly=true'),
   });
   const salesQuery = useQuery({
     queryKey: ['sales', from, to, sellerFilter],
@@ -52,6 +68,7 @@ export function SalesAdminPanel() {
   const users = usersQuery.data ?? [];
   const activeUsers = users.filter((user) => user.isActive);
   const contacts = contactsQuery.data ?? [];
+  const products = productsQuery.data ?? [];
   const totalRevenue = (salesQuery.data ?? [])
     .filter((sale) => sale.status === 'PAID')
     .reduce((total, sale) => total + sale.amount, 0);
@@ -68,6 +85,7 @@ export function SalesAdminPanel() {
           amount: Number(amount),
           sellerId: sellerId || undefined,
           contactId: contactId || undefined,
+          productId: productId || undefined,
           status,
           soldAt,
           note: note.trim() || undefined,
@@ -76,6 +94,7 @@ export function SalesAdminPanel() {
       setTitle('');
       setAmount('');
       setContactId('');
+      setProductId('');
       setNote('');
       await invalidateBusinessQueries(queryClient);
       toast.success('Venda registrada.');
@@ -83,6 +102,16 @@ export function SalesAdminPanel() {
       toast.error(error instanceof Error ? error.message : 'Nao foi possivel registrar a venda.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  function selectProduct(nextProductId: string) {
+    setProductId(nextProductId);
+    const product = products.find((item) => item.id === nextProductId);
+
+    if (product) {
+      setTitle(product.name);
+      setAmount(String(product.price));
     }
   }
 
@@ -111,14 +140,42 @@ export function SalesAdminPanel() {
         </div>
       </div>
 
-      <form onSubmit={createSale} className="grid gap-3 rounded-md border border-border bg-card p-4 xl:grid-cols-[1.2fr_150px_190px_1fr_145px]">
+      <form
+        onSubmit={createSale}
+        className="grid gap-3 rounded-md border border-border bg-card p-4 xl:grid-cols-[1fr_1fr_150px_190px_1fr_145px]"
+      >
+        <label className="space-y-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Produto</span>
+          <select
+            value={productId}
+            onChange={(event) => selectProduct(event.target.value)}
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="">Selecionar produto</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.name} - {formatCurrency(product.price)}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="space-y-1.5">
           <span className="text-xs font-medium text-muted-foreground">Venda</span>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Produto, plano ou servico" />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Produto, plano ou servico"
+          />
         </label>
         <label className="space-y-1.5">
           <span className="text-xs font-medium text-muted-foreground">Valor</span>
-          <Input type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} />
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+          />
         </label>
         <label className="space-y-1.5">
           <span className="text-xs font-medium text-muted-foreground">Atendente</span>
@@ -168,12 +225,21 @@ export function SalesAdminPanel() {
             ))}
           </select>
         </label>
-        <label className="space-y-1.5 xl:col-span-3">
+        <label className="space-y-1.5 xl:col-span-4">
           <span className="text-xs font-medium text-muted-foreground">Observacao</span>
-          <Textarea value={note} onChange={(event) => setNote(event.target.value)} rows={2} placeholder="Detalhes internos" />
+          <Textarea
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            rows={2}
+            placeholder="Detalhes internos"
+          />
         </label>
         <div className="flex items-end">
-          <Button type="submit" className="w-full" disabled={saving || !title.trim() || Number(amount) <= 0}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={saving || !title.trim() || Number(amount) <= 0}
+          >
             <Banknote />
             Registrar
           </Button>
@@ -276,12 +342,22 @@ function SaleItem({ sale, users }: { sale: SaleSummary; users: UserSummary[] }) 
         <span className="text-xs font-medium text-muted-foreground">Venda</span>
         <Input value={title} onChange={(event) => setTitle(event.target.value)} />
         <span className="block truncate text-xs text-muted-foreground">
-          {sale.contact ? `${sale.contact.name} - ${formatPhone(sale.contact.phone)}` : 'Sem contato vinculado'}
+          {sale.product
+            ? sale.product.name
+            : sale.contact
+              ? `${sale.contact.name} - ${formatPhone(sale.contact.phone)}`
+              : 'Sem contato vinculado'}
         </span>
       </label>
       <label className="space-y-1.5">
         <span className="text-xs font-medium text-muted-foreground">Valor</span>
-        <Input type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} />
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+        />
       </label>
       <label className="space-y-1.5">
         <span className="text-xs font-medium text-muted-foreground">Atendente</span>
@@ -317,7 +393,9 @@ function SaleItem({ sale, users }: { sale: SaleSummary; users: UserSummary[] }) 
           {latestMetaEvent ? metaConversionStatusLabels[latestMetaEvent.status] : 'Nao enviado'}
         </div>
         {latestMetaEvent?.errorMessage ? (
-          <span className="block truncate text-xs text-destructive">{latestMetaEvent.errorMessage}</span>
+          <span className="block truncate text-xs text-destructive">
+            {latestMetaEvent.errorMessage}
+          </span>
         ) : null}
       </div>
       <div className="flex items-end gap-1">

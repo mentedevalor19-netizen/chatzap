@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { ConversationStatus, Prisma, SaleStatus, UserRole } from '@prisma/client';
+import { ConversationStatus, ExpenseCategory, Prisma, SaleStatus, UserRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildDateRange, decimalToNumber } from './finance.utils';
@@ -29,10 +29,12 @@ export class MetricsService {
       pendingSalesCount,
       expenseAggregate,
       expenseCount,
+      ltvExpenseAggregate,
       contactsCount,
       conversationGroups,
       salesBySellerGroups,
       expensesByCategoryGroups,
+      paidSalesInPeriod,
     ] = await Promise.all([
       this.prisma.sale.aggregate({ where: paidSalesWhere, _sum: { amount: true } }),
       this.prisma.sale.count({ where: paidSalesWhere }),
@@ -45,6 +47,13 @@ export class MetricsService {
       }),
       this.prisma.expense.aggregate({ where: expenseWhere, _sum: { amount: true } }),
       this.prisma.expense.count({ where: expenseWhere }),
+      this.prisma.expense.aggregate({
+        where: {
+          ...expenseWhere,
+          category: ExpenseCategory.LTV,
+        },
+        _sum: { amount: true },
+      }),
       this.prisma.contact.count({ where: { organizationId: user.organizationId } }),
       this.prisma.conversation.groupBy({
         by: ['status'],
@@ -65,6 +74,13 @@ export class MetricsService {
         _count: { _all: true },
         orderBy: { _sum: { amount: 'desc' } },
       }),
+      this.prisma.sale.findMany({
+        where: {
+          ...paidSalesWhere,
+          contactId: { not: null },
+        },
+        select: { id: true, contactId: true, amount: true, soldAt: true, createdAt: true },
+      }),
     ]);
 
     const sellerIds = salesBySellerGroups
@@ -79,6 +95,8 @@ export class MetricsService {
     const sellerMap = new Map(sellers.map((seller) => [seller.id, seller]));
     const revenue = decimalToNumber(salesAggregate._sum.amount);
     const expenses = decimalToNumber(expenseAggregate._sum.amount);
+    const ltvCost = decimalToNumber(ltvExpenseAggregate._sum.amount);
+    const ltvStats = await this.calculateLtvStats(user.organizationId, paidSalesInPeriod);
     const profit = revenue - expenses;
     const conversationStats = this.serializeConversationStats(conversationGroups);
 
@@ -90,12 +108,16 @@ export class MetricsService {
       salesCount,
       pendingSalesCount,
       averageTicket: salesCount > 0 ? revenue / salesCount : 0,
+      ltvRevenue: ltvStats.revenue,
+      ltvSalesCount: ltvStats.salesCount,
+      ltvCost,
+      ltvProfit: ltvStats.revenue - ltvCost,
       expenseCount,
       contactsCount,
       conversations: conversationStats,
       salesBySeller: salesBySellerGroups.map((group) => ({
         sellerId: group.sellerId,
-        seller: group.sellerId ? sellerMap.get(group.sellerId) ?? null : null,
+        seller: group.sellerId ? (sellerMap.get(group.sellerId) ?? null) : null,
         revenue: decimalToNumber(group._sum.amount),
         salesCount: group._count._all,
       })),
@@ -113,7 +135,62 @@ export class MetricsService {
     }
   }
 
-  private serializeConversationStats(groups: Array<{ status: ConversationStatus; _count: { _all: number } }>) {
+  private async calculateLtvStats(
+    organizationId: string,
+    salesInPeriod: Array<{
+      id: string;
+      contactId: string | null;
+      amount: unknown;
+      soldAt: Date;
+      createdAt: Date;
+    }>,
+  ) {
+    const contactIds = [
+      ...new Set(
+        salesInPeriod.map((sale) => sale.contactId).filter((id): id is string => Boolean(id)),
+      ),
+    ];
+
+    if (!contactIds.length) {
+      return { revenue: 0, salesCount: 0 };
+    }
+
+    const history = await this.prisma.sale.findMany({
+      where: {
+        organizationId,
+        status: SaleStatus.PAID,
+        contactId: { in: contactIds },
+      },
+      select: { id: true, contactId: true, soldAt: true, createdAt: true },
+      orderBy: [{ contactId: 'asc' }, { soldAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    });
+    const recurrentSaleIds = new Set<string>();
+    const seenContacts = new Set<string>();
+
+    for (const sale of history) {
+      if (!sale.contactId) {
+        continue;
+      }
+
+      if (seenContacts.has(sale.contactId)) {
+        recurrentSaleIds.add(sale.id);
+      } else {
+        seenContacts.add(sale.contactId);
+      }
+    }
+
+    const ltvSales = salesInPeriod.filter((sale) => recurrentSaleIds.has(sale.id));
+    const revenue = ltvSales.reduce((total, sale) => total + decimalToNumber(sale.amount), 0);
+
+    return {
+      revenue,
+      salesCount: ltvSales.length,
+    };
+  }
+
+  private serializeConversationStats(
+    groups: Array<{ status: ConversationStatus; _count: { _all: number } }>,
+  ) {
     const map = new Map(groups.map((group) => [group.status, group._count._all]));
     const open = map.get(ConversationStatus.OPEN) ?? 0;
     const pending = map.get(ConversationStatus.PENDING) ?? 0;

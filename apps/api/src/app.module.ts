@@ -8,6 +8,7 @@ import { HealthController } from './modules/health/health.controller';
 import { MessagesModule } from './modules/messages/messages.module';
 import { MetaModule } from './modules/meta/meta.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
+import { ProductsModule } from './modules/products/products.module';
 import { QuickRepliesModule } from './modules/quick-replies/quick-replies.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { RedisModule } from './modules/redis/redis.module';
@@ -32,6 +33,7 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
     FinanceModule,
     MessagesModule,
     MetaModule,
+    ProductsModule,
     QuickRepliesModule,
     TagsModule,
     UploadsModule,

@@ -22,6 +22,7 @@ CRM de atendimento via WhatsApp construído exclusivamente sobre a API Oficial d
 │   │           ├── messages
 │   │           ├── meta
 │   │           ├── prisma
+│   │           ├── products
 │   │           ├── quick-replies
 │   │           ├── realtime
 │   │           ├── redis
@@ -63,9 +64,10 @@ Os modelos estão em `apps/api/prisma/schema.prisma`.
 - `Funnel`: funil ativo por organização.
 - `FunnelStep`: etapas ordenadas com texto, imagem, áudio, vídeo, documento, pausa por resposta, atraso antes do envio e áudio como nota de voz.
 - `ConversationFunnelRun`: estado de execução do funil em cada conversa.
-- `QuickReply`: respostas rápidas por organização, acionadas no chat pelo atalho `/comando`.
-- `Sale`: vendas manuais com valor, status, data, atendente e vínculo opcional com contato/conversa.
-- `Expense`: gastos manuais por categoria para ads, fornecedores, ferramentas e outros custos.
+- `QuickReply`: respostas rápidas por organização, acionadas no chat pelo atalho `/comando`, com texto e imagem opcional.
+- `Product`: catálogo simples de produtos para selecionar no cadastro da venda.
+- `Sale`: vendas manuais com valor, status, data, atendente e vínculo opcional com produto, contato/conversa.
+- `Expense`: gastos manuais por categoria para ads, fornecedores, LTV, ferramentas e outros custos.
 - `MetaIntegrationSetting`: configurações da Meta Conversions API por organização.
 - `AdAttribution`: dados do anúncio Click-to-WhatsApp capturados do webhook, incluindo `ctwa_clid`.
 - `MetaConversionEvent`: histórico de envios, falhas e eventos ignorados da Conversions API.
@@ -76,59 +78,63 @@ As migrations estão em `apps/api/prisma/migrations`.
 
 Base local: `http://localhost:4000/api/v1`
 
-| Método | Rota | Uso |
-| --- | --- | --- |
-| `GET` | `/health` | Health check |
-| `POST` | `/auth/login` | Login JWT |
-| `GET` | `/auth/me` | Usuário autenticado |
-| `GET` | `/users?search=` | Lista usuários/atendentes |
-| `POST` | `/users` | Cria atendente ou admin |
-| `PATCH` | `/users/:id` | Atualiza atendente |
-| `DELETE` | `/users/:id` | Desativa atendente |
-| `GET` | `/contacts?search=` | Lista/pesquisa contatos |
-| `POST` | `/contacts` | Cria contato |
-| `GET` | `/contacts/:id` | Detalha contato |
-| `PATCH` | `/contacts/:id` | Atualiza contato |
-| `DELETE` | `/contacts/:id` | Remove contato |
-| `GET` | `/contacts/:id/notes` | Lista notas internas |
-| `POST` | `/contacts/:id/notes` | Cria nota interna |
-| `GET` | `/tags` | Lista tags |
-| `POST` | `/tags` | Cria tag |
-| `PATCH` | `/tags/:id` | Atualiza tag |
-| `DELETE` | `/tags/:id` | Remove tag |
-| `GET` | `/conversations?status=&search=` | Lista conversas |
-| `GET` | `/conversations/:id` | Detalha conversa |
-| `PATCH` | `/conversations/:id/status` | Altera status |
-| `PATCH` | `/conversations/:id/assign` | Atribui atendente |
-| `POST` | `/conversations/:id/read` | Zera não lidas |
-| `POST` | `/conversations/:id/funnel/start` | Envia o funil inicial e encaminha para humano |
-| `GET` | `/conversations/:id/messages?cursor=&limit=` | Histórico com paginação |
-| `POST` | `/conversations/:id/messages` | Envia texto, mídia, localização, contato ou template |
-| `GET` | `/funnels/active` | Retorna o funil ativo da organização |
-| `PUT` | `/funnels/active` | Cria/atualiza o funil ativo |
-| `GET` | `/quick-replies?search=` | Lista/pesquisa respostas rápidas |
-| `POST` | `/quick-replies` | Cria resposta rápida |
-| `PATCH` | `/quick-replies/:id` | Atualiza resposta rápida |
-| `DELETE` | `/quick-replies/:id` | Remove resposta rápida |
-| `GET` | `/sales?from=&to=&sellerId=&status=&search=` | Lista vendas |
-| `POST` | `/sales` | Registra venda manual |
-| `PATCH` | `/sales/:id` | Atualiza venda |
-| `DELETE` | `/sales/:id` | Remove venda |
-| `GET` | `/expenses?from=&to=&category=&search=` | Lista gastos |
-| `POST` | `/expenses` | Registra gasto manual |
-| `PATCH` | `/expenses/:id` | Atualiza gasto |
-| `DELETE` | `/expenses/:id` | Remove gasto |
-| `GET` | `/metrics/crm?from=&to=` | Resumo de faturamento, gastos, lucro, margem e vendas por atendente |
-| `GET` | `/meta/conversions/settings` | Retorna configuração da Meta CAPI sem expor token |
-| `PUT` | `/meta/conversions/settings` | Salva dataset, WABA ID, token e preferências de envio |
-| `GET` | `/meta/conversions/events` | Lista eventos enviados/tentados para a Meta |
-| `POST` | `/meta/conversions/events/:id/retry` | Reenvia evento com falha/ignorado |
-| `POST` | `/meta/conversions/sales/:saleId/send` | Envia manualmente uma venda paga para a Meta |
-| `POST` | `/uploads` | Upload com Multer |
-| `GET` | `/uploads/files/:fileName` | Download/URL pública local |
-| `GET` | `/search?q=` | Busca global |
-| `GET` | `/webhooks/whatsapp` | Verificação Meta |
-| `POST` | `/webhooks/whatsapp` | Recebimento de eventos Meta |
+| Método   | Rota                                                    | Uso                                                                      |
+| -------- | ------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `GET`    | `/health`                                               | Health check                                                             |
+| `POST`   | `/auth/login`                                           | Login JWT                                                                |
+| `GET`    | `/auth/me`                                              | Usuário autenticado                                                      |
+| `GET`    | `/users?search=`                                        | Lista usuários/atendentes                                                |
+| `POST`   | `/users`                                                | Cria atendente ou admin                                                  |
+| `PATCH`  | `/users/:id`                                            | Atualiza atendente                                                       |
+| `DELETE` | `/users/:id`                                            | Desativa atendente                                                       |
+| `GET`    | `/contacts?search=`                                     | Lista/pesquisa contatos                                                  |
+| `POST`   | `/contacts`                                             | Cria contato                                                             |
+| `GET`    | `/contacts/:id`                                         | Detalha contato                                                          |
+| `PATCH`  | `/contacts/:id`                                         | Atualiza contato                                                         |
+| `DELETE` | `/contacts/:id`                                         | Remove contato                                                           |
+| `GET`    | `/contacts/:id/notes`                                   | Lista notas internas                                                     |
+| `POST`   | `/contacts/:id/notes`                                   | Cria nota interna                                                        |
+| `GET`    | `/tags`                                                 | Lista tags                                                               |
+| `POST`   | `/tags`                                                 | Cria tag                                                                 |
+| `PATCH`  | `/tags/:id`                                             | Atualiza tag                                                             |
+| `DELETE` | `/tags/:id`                                             | Remove tag                                                               |
+| `GET`    | `/conversations?status=&search=`                        | Lista conversas                                                          |
+| `GET`    | `/conversations/:id`                                    | Detalha conversa                                                         |
+| `PATCH`  | `/conversations/:id/status`                             | Altera status                                                            |
+| `PATCH`  | `/conversations/:id/assign`                             | Atribui atendente                                                        |
+| `POST`   | `/conversations/:id/read`                               | Zera não lidas                                                           |
+| `POST`   | `/conversations/:id/funnel/start`                       | Envia o funil inicial e encaminha para humano                            |
+| `GET`    | `/conversations/:id/messages?cursor=&limit=`            | Histórico com paginação                                                  |
+| `POST`   | `/conversations/:id/messages`                           | Envia texto, mídia, localização, contato ou template                     |
+| `GET`    | `/funnels/active`                                       | Retorna o funil ativo da organização                                     |
+| `PUT`    | `/funnels/active`                                       | Cria/atualiza o funil ativo                                              |
+| `GET`    | `/quick-replies?search=`                                | Lista/pesquisa respostas rápidas                                         |
+| `POST`   | `/quick-replies`                                        | Cria resposta rápida                                                     |
+| `PATCH`  | `/quick-replies/:id`                                    | Atualiza resposta rápida                                                 |
+| `DELETE` | `/quick-replies/:id`                                    | Remove resposta rápida                                                   |
+| `GET`    | `/products?search=&activeOnly=`                         | Lista produtos                                                           |
+| `POST`   | `/products`                                             | Cria produto                                                             |
+| `PATCH`  | `/products/:id`                                         | Atualiza produto                                                         |
+| `DELETE` | `/products/:id`                                         | Desativa produto                                                         |
+| `GET`    | `/sales?from=&to=&sellerId=&contactId=&status=&search=` | Lista vendas                                                             |
+| `POST`   | `/sales`                                                | Registra venda manual                                                    |
+| `PATCH`  | `/sales/:id`                                            | Atualiza venda                                                           |
+| `DELETE` | `/sales/:id`                                            | Remove venda                                                             |
+| `GET`    | `/expenses?from=&to=&category=&search=`                 | Lista gastos                                                             |
+| `POST`   | `/expenses`                                             | Registra gasto manual                                                    |
+| `PATCH`  | `/expenses/:id`                                         | Atualiza gasto                                                           |
+| `DELETE` | `/expenses/:id`                                         | Remove gasto                                                             |
+| `GET`    | `/metrics/crm?from=&to=`                                | Resumo de faturamento, gastos, lucro, margem, LTV e vendas por atendente |
+| `GET`    | `/meta/conversions/settings`                            | Retorna configuração da Meta CAPI sem expor token                        |
+| `PUT`    | `/meta/conversions/settings`                            | Salva dataset, WABA ID, token e preferências de envio                    |
+| `GET`    | `/meta/conversions/events`                              | Lista eventos enviados/tentados para a Meta                              |
+| `POST`   | `/meta/conversions/events/:id/retry`                    | Reenvia evento com falha/ignorado                                        |
+| `POST`   | `/meta/conversions/sales/:saleId/send`                  | Envia manualmente uma venda paga para a Meta                             |
+| `POST`   | `/uploads`                                              | Upload com Multer                                                        |
+| `GET`    | `/uploads/files/:fileName`                              | Download/URL pública local                                               |
+| `GET`    | `/search?q=`                                            | Busca global                                                             |
+| `GET`    | `/webhooks/whatsapp`                                    | Verificação Meta                                                         |
+| `POST`   | `/webhooks/whatsapp`                                    | Recebimento de eventos Meta                                              |
 
 ## 4. Fluxo dos Webhooks
 
@@ -171,13 +177,15 @@ Base local: `http://localhost:4000/api/v1`
   - envio de texto e anexos;
   - drag-and-drop de arquivos;
   - preview de upload;
-  - respostas rápidas com `/comando` para preencher o input;
-  - painel lateral com dados, tags, notas e status.
+  - respostas rápidas com `/comando` para preencher o input e anexar imagem cadastrada;
+  - painel lateral com dados, tags, notas, status, marcação de venda e histórico de vendas do lead.
   - botão manual para enviar o funil inicial e iniciar o handoff humano.
-  - aba `Admin` com subtelas para funil, equipe, vendas, financeiro e Meta Ads.
+  - aba própria de respostas rápidas no menu principal.
+  - aba `Admin` com subtelas para funil, equipe, produtos, vendas, financeiro e Meta Ads.
   - tela de equipe para criar atendentes/admins, trocar senha inicial e ativar/desativar usuários.
-  - tela de vendas para registrar vendas manuais por atendente e filtrar por período/status.
-  - tela financeiro para lançar gastos de ads, fornecedor, ferramentas e outros, exibindo faturamento, gastos, lucro, margem e ticket médio.
+  - tela de produtos para criar o catálogo selecionável no cadastro da venda.
+  - tela de vendas para registrar vendas manuais por produto/atendente e filtrar por período/status.
+  - tela financeiro para lançar gastos de ads, fornecedor, LTV, ferramentas e outros, exibindo faturamento, gastos, lucro, margem, ticket médio e indicadores de LTV.
   - tela Meta Ads para configurar Conversions API, ver envios recentes e reenviar eventos.
 
 ## 6. Componentes Reutilizáveis
@@ -212,6 +220,7 @@ Componentes administrativos em `apps/web/components/admin`:
 
 - `FunnelAdminPanel`
 - `QuickRepliesAdminPanel`
+- `ProductsAdminPanel`
 - `TeamAdminPanel`
 - `SalesAdminPanel`
 - `FinanceAdminPanel`
@@ -309,15 +318,16 @@ URLs locais:
 5. Realtime: abrir duas abas e validar eventos Socket.IO.
 6. Envio texto: configurar credenciais Meta e enviar mensagem outbound.
 7. Funil: configurar etapas na aba `Admin`, definir delays em segundos, marcar a pergunta para aguardar resposta e testar a continuação com qualquer resposta do cliente.
-8. Respostas rápidas: cadastrar atalhos na aba `Admin`, digitar `/comando` no chat e conferir o preenchimento do input antes do envio.
+8. Respostas rápidas: cadastrar atalhos na aba `Respostas`, opcionalmente anexar imagem, digitar `/comando` no chat e conferir o preenchimento do input antes do envio.
 9. Equipe: criar atendentes, testar login individual e desativar usuários sem remover histórico.
-10. Vendas: registrar vendas manuais por atendente, filtrar por período e conferir totais.
-11. Financeiro: lançar gastos diários de ads/fornecedor e validar lucro, margem e ticket médio.
-12. Meta Ads: configurar CAPI, gerar lead real por anúncio Click-to-WhatsApp, confirmar `ctwa_clid` salvo e marcar uma venda paga.
-13. Mídias: testar upload local, depois troca para upload direto na Cloud API ou storage público.
-14. Status: validar webhooks `sent`, `delivered`, `read` e `failed`.
-15. Busca: validar pesquisa por nome, telefone e conteúdo.
-16. Escala: adicionar filas, múltiplos números, chatbot/IA, integrações financeiras e políticas de retenção sem alterar o núcleo do chat.
+10. Produtos: criar produtos ativos para seleção rápida no registro de vendas.
+11. Vendas: registrar vendas pelo painel do lead ou pela aba de vendas, filtrar por período e conferir totais.
+12. LTV: registrar uma segunda venda paga para o mesmo lead e validar a tag `LTV`, receita LTV, custo LTV e lucro LTV no financeiro.
+13. Meta Ads: configurar CAPI, gerar lead real por anúncio Click-to-WhatsApp, confirmar `ctwa_clid` salvo e marcar uma venda paga.
+14. Mídias: testar upload local, depois troca para upload direto na Cloud API ou storage público.
+15. Status: validar webhooks `sent`, `delivered`, `read` e `failed`.
+16. Busca: validar pesquisa por nome, telefone e conteúdo.
+17. Escala: adicionar filas, múltiplos números, chatbot/IA, integrações financeiras e políticas de retenção sem alterar o núcleo do chat.
 
 ## Validação
 

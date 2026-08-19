@@ -70,6 +70,7 @@ enum SaleStatus {
 enum ExpenseCategory {
   ADS
   SUPPLIER
+  LTV
   TOOLS
   OTHER
 }
@@ -87,20 +88,21 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  users        User[]
-  contacts     Contact[]
-  conversations Conversation[]
-  messages     Message[]
-  tags         Tag[]
-  notes        Note[]
-  funnels      Funnel[]
-  funnelSteps  FunnelStep[]
-  funnelRuns   ConversationFunnelRun[]
-  quickReplies QuickReply[]
-  sales        Sale[]
-  expenses     Expense[]
-  metaSettings MetaIntegrationSetting?
-  adAttributions AdAttribution[]
+  users                User[]
+  contacts             Contact[]
+  conversations        Conversation[]
+  messages             Message[]
+  tags                 Tag[]
+  notes                Note[]
+  funnels              Funnel[]
+  funnelSteps          FunnelStep[]
+  funnelRuns           ConversationFunnelRun[]
+  quickReplies         QuickReply[]
+  products             Product[]
+  sales                Sale[]
+  expenses             Expense[]
+  metaSettings         MetaIntegrationSetting?
+  adAttributions       AdAttribution[]
   metaConversionEvents MetaConversionEvent[]
 
   @@map("organizations")
@@ -130,24 +132,24 @@ model User {
 }
 
 model Contact {
-  id             String   @id @default(cuid())
-  organizationId String   @map("organization_id")
-  waId           String   @map("wa_id")
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  waId           String    @map("wa_id")
   phone          String
   name           String
-  avatarUrl      String?  @map("avatar_url")
+  avatarUrl      String?   @map("avatar_url")
   lastSeenAt     DateTime? @map("last_seen_at")
   metadata       Json?
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  conversations Conversation[]
-  messages      Message[]
-  tags          ContactTag[]
-  notes         Note[]
-  sales         Sale[]
-  adAttributions AdAttribution[]
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversations        Conversation[]
+  messages             Message[]
+  tags                 ContactTag[]
+  notes                Note[]
+  sales                Sale[]
+  adAttributions       AdAttribution[]
   metaConversionEvents MetaConversionEvent[]
 
   @@unique([organizationId, waId])
@@ -167,13 +169,13 @@ model Conversation {
   createdAt      DateTime           @default(now()) @map("created_at")
   updatedAt      DateTime           @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  assignedTo   User?        @relation("AssignedConversations", fields: [assignedToId], references: [id], onDelete: SetNull)
-  messages     Message[]
-  funnelRuns   ConversationFunnelRun[]
-  sales        Sale[]
-  adAttributions AdAttribution[]
+  organization         Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact              Contact                 @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  assignedTo           User?                   @relation("AssignedConversations", fields: [assignedToId], references: [id], onDelete: SetNull)
+  messages             Message[]
+  funnelRuns           ConversationFunnelRun[]
+  sales                Sale[]
+  adAttributions       AdAttribution[]
   metaConversionEvents MetaConversionEvent[]
 
   @@index([organizationId, status, lastMessageAt])
@@ -275,7 +277,7 @@ model Funnel {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   steps        FunnelStep[]
   runs         ConversationFunnelRun[]
 
@@ -336,6 +338,9 @@ model QuickReply {
   organizationId String   @map("organization_id")
   shortcut       String
   body           String
+  mediaUrl       String?  @map("media_url")
+  mimeType       String?  @map("mime_type")
+  fileName       String?  @map("file_name")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -346,12 +351,32 @@ model QuickReply {
   @@map("quick_replies")
 }
 
+model Product {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  sku            String?
+  description    String?
+  price          Decimal  @db.Decimal(12, 2)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sales        Sale[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive, name])
+  @@map("products")
+}
+
 model Sale {
   id             String     @id @default(cuid())
   organizationId String     @map("organization_id")
   sellerId       String?    @map("seller_id")
   contactId      String?    @map("contact_id")
   conversationId String?    @map("conversation_id")
+  productId      String?    @map("product_id")
   title          String
   amount         Decimal    @db.Decimal(12, 2)
   status         SaleStatus @default(PAID)
@@ -360,14 +385,16 @@ model Sale {
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  seller       User?         @relation("SellerSales", fields: [sellerId], references: [id], onDelete: SetNull)
-  contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  seller               User?                 @relation("SellerSales", fields: [sellerId], references: [id], onDelete: SetNull)
+  contact              Contact?              @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  conversation         Conversation?         @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  product              Product?              @relation(fields: [productId], references: [id], onDelete: SetNull)
   metaConversionEvents MetaConversionEvent[]
 
   @@index([organizationId, soldAt])
   @@index([organizationId, sellerId, soldAt])
+  @@index([organizationId, productId, soldAt])
   @@index([organizationId, status, soldAt])
   @@map("sales")
 }

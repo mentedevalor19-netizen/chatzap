@@ -2,16 +2,26 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Clock3, Save, StickyNote, Tag, Trash2, Workflow, X } from 'lucide-react';
+import {
+  Banknote,
+  CheckCircle2,
+  Clock3,
+  Save,
+  StickyNote,
+  Tag,
+  Trash2,
+  Workflow,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
-import type { ConversationSummary, Note } from '@/lib/types';
+import type { ConversationSummary, Note, ProductSummary, SaleSummary } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { apiFetch } from '@/lib/api';
-import { formatPhone, initials } from '@/lib/utils';
+import { formatCurrency, formatPhone, formatShortDate, initials } from '@/lib/utils';
 import { useChatStore } from '@/stores/chat-store';
 
 export function ContactPanel({ conversation }: { conversation?: ConversationSummary }) {
@@ -24,17 +34,33 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [startingFunnel, setStartingFunnel] = useState(false);
+  const [saleProductId, setSaleProductId] = useState('');
+  const [saleAmount, setSaleAmount] = useState('');
+  const [saleNote, setSaleNote] = useState('');
+  const [savingSale, setSavingSale] = useState(false);
 
   const notesQuery = useQuery({
     queryKey: ['contact-notes', conversation?.contact.id],
     enabled: Boolean(conversation?.contact.id),
     queryFn: () => apiFetch<Note[]>(`/contacts/${conversation?.contact.id}/notes`),
   });
+  const productsQuery = useQuery({
+    queryKey: ['products', 'active'],
+    queryFn: () => apiFetch<ProductSummary[]>('/products?activeOnly=true'),
+  });
+  const salesQuery = useQuery({
+    queryKey: ['sales', 'contact', conversation?.contact.id],
+    enabled: Boolean(conversation?.contact.id),
+    queryFn: () => apiFetch<SaleSummary[]>(`/sales?contactId=${conversation?.contact.id}`),
+  });
 
   useEffect(() => {
     setName(conversation?.contact.name ?? '');
     setPhone(conversation?.contact.phone ?? '');
     setNote('');
+    setSaleProductId('');
+    setSaleAmount('');
+    setSaleNote('');
   }, [conversation?.contact.id, conversation?.contact.name, conversation?.contact.phone]);
 
   if (!conversation) {
@@ -42,6 +68,7 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
   }
 
   const activeConversation = conversation;
+  const paidSalesCount = salesQuery.data?.filter((sale) => sale.status === 'PAID').length ?? 0;
 
   async function updateContact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -99,7 +126,61 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
       body: JSON.stringify({ body: note.trim() }),
     });
     setNote('');
-    await queryClient.invalidateQueries({ queryKey: ['contact-notes', activeConversation.contact.id] });
+    await queryClient.invalidateQueries({
+      queryKey: ['contact-notes', activeConversation.contact.id],
+    });
+  }
+
+  function selectSaleProduct(productId: string) {
+    setSaleProductId(productId);
+    const product = productsQuery.data?.find((item) => item.id === productId);
+
+    if (product) {
+      setSaleAmount(String(product.price));
+    }
+  }
+
+  async function createSale() {
+    const product = productsQuery.data?.find((item) => item.id === saleProductId);
+
+    if (!product || Number(saleAmount) <= 0) {
+      toast.error('Selecione um produto e informe o valor.');
+      return;
+    }
+
+    setSavingSale(true);
+    try {
+      await apiFetch('/sales', {
+        method: 'POST',
+        body: JSON.stringify({
+          productId: product.id,
+          title: product.name,
+          amount: Number(saleAmount),
+          contactId: activeConversation.contact.id,
+          conversationId: activeConversation.id,
+          status: 'PAID',
+          note: saleNote.trim() || undefined,
+        }),
+      });
+      setSaleProductId('');
+      setSaleAmount('');
+      setSaleNote('');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['sales'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['sales', 'contact', activeConversation.contact.id],
+        }),
+        queryClient.invalidateQueries({ queryKey: ['conversations'] }),
+        queryClient.invalidateQueries({ queryKey: ['contacts'] }),
+        queryClient.invalidateQueries({ queryKey: ['crm-metrics'] }),
+        queryClient.invalidateQueries({ queryKey: ['meta-conversions-events'] }),
+      ]);
+      toast.success('Venda marcada no lead.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Nao foi possivel marcar a venda.');
+    } finally {
+      setSavingSale(false);
+    }
   }
 
   async function removeContact() {
@@ -121,7 +202,13 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
           <Tag className="h-4 w-4 text-primary" />
           Contato
         </div>
-        <Button type="button" variant="ghost" size="icon" aria-label="Fechar painel" onClick={() => setInfoOpen(false)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Fechar painel"
+          onClick={() => setInfoOpen(false)}
+        >
           <X />
         </Button>
       </header>
@@ -129,8 +216,13 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
       <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto">
         <section className="flex flex-col items-center px-6 py-6 text-center">
           <Avatar className="h-20 w-20">
-            <AvatarImage src={conversation.contact.avatarUrl ?? undefined} alt={conversation.contact.name} />
-            <AvatarFallback className="text-xl">{initials(conversation.contact.name)}</AvatarFallback>
+            <AvatarImage
+              src={conversation.contact.avatarUrl ?? undefined}
+              alt={conversation.contact.name}
+            />
+            <AvatarFallback className="text-xl">
+              {initials(conversation.contact.name)}
+            </AvatarFallback>
           </Avatar>
           <h2 className="mt-3 text-lg font-semibold">{conversation.contact.name}</h2>
           <p className="text-sm text-muted-foreground">{formatPhone(conversation.contact.phone)}</p>
@@ -140,8 +232,16 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
 
         <form onSubmit={updateContact} className="space-y-3 px-4 py-4">
           <p className="text-xs font-semibold uppercase text-muted-foreground">Dados do contato</p>
-          <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nome" />
-          <Input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Telefone" />
+          <Input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Nome"
+          />
+          <Input
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            placeholder="Telefone"
+          />
           <Button type="submit" size="sm" className="w-full" disabled={saving}>
             <Save />
             Salvar
@@ -168,17 +268,94 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
         <Separator />
 
         <section className="space-y-3 px-4 py-4">
-          <p className="text-xs font-semibold uppercase text-muted-foreground">Status da conversa</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">Vendas do lead</p>
+            {paidSalesCount > 1 ? (
+              <span className="rounded-md bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
+                LTV
+              </span>
+            ) : null}
+          </div>
+          <div className="space-y-2 rounded-md border border-border bg-background p-3">
+            <select
+              value={saleProductId}
+              onChange={(event) => selectSaleProduct(event.target.value)}
+              className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Selecionar produto</option>
+              {(productsQuery.data ?? []).map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name} - {formatCurrency(product.price)}
+                </option>
+              ))}
+            </select>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={saleAmount}
+              onChange={(event) => setSaleAmount(event.target.value)}
+              placeholder="Valor da venda"
+            />
+            <Textarea
+              value={saleNote}
+              onChange={(event) => setSaleNote(event.target.value)}
+              rows={2}
+              placeholder="Observacao opcional"
+            />
+            <Button
+              type="button"
+              size="sm"
+              className="w-full"
+              disabled={savingSale || !saleProductId || Number(saleAmount) <= 0}
+              onClick={() => void createSale()}
+            >
+              <Banknote />
+              {savingSale ? 'Marcando...' : 'Marcar venda'}
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {salesQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Carregando vendas...</p>
+            ) : salesQuery.data?.length ? (
+              salesQuery.data.slice(0, 5).map((sale) => <LeadSaleItem key={sale.id} sale={sale} />)
+            ) : (
+              <p className="text-sm text-muted-foreground">Sem vendas anteriores.</p>
+            )}
+          </div>
+        </section>
+
+        <Separator />
+
+        <section className="space-y-3 px-4 py-4">
+          <p className="text-xs font-semibold uppercase text-muted-foreground">
+            Status da conversa
+          </p>
           <div className="grid gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => void updateStatus('OPEN')}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void updateStatus('OPEN')}
+            >
               <Clock3 />
               Em atendimento
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => void updateStatus('PENDING')}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void updateStatus('PENDING')}
+            >
               <Clock3 />
               Pendente
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => void updateStatus('CLOSED')}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void updateStatus('CLOSED')}
+            >
               <CheckCircle2 />
               Finalizar
             </Button>
@@ -219,7 +396,13 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
             placeholder="Adicionar nota interna"
             rows={3}
           />
-          <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => void createNote()}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            onClick={() => void createNote()}
+          >
             Adicionar nota
           </Button>
           <div className="space-y-2">
@@ -237,12 +420,35 @@ export function ContactPanel({ conversation }: { conversation?: ConversationSumm
         <Separator />
 
         <section className="px-4 py-4">
-          <Button type="button" variant="destructive" size="sm" className="w-full" onClick={() => void removeContact()}>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            className="w-full"
+            onClick={() => void removeContact()}
+          >
             <Trash2 />
             Excluir contato
           </Button>
         </section>
       </div>
     </aside>
+  );
+}
+
+function LeadSaleItem({ sale }: { sale: SaleSummary }) {
+  return (
+    <div className="rounded-md border border-border bg-background p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">{sale.product?.name ?? sale.title}</p>
+          <p className="truncate text-xs text-muted-foreground">{formatShortDate(sale.soldAt)}</p>
+        </div>
+        <span className="shrink-0 text-sm font-semibold text-primary">
+          {formatCurrency(sale.amount)}
+        </span>
+      </div>
+      {sale.note ? <p className="mt-2 text-xs text-muted-foreground">{sale.note}</p> : null}
+    </div>
   );
 }

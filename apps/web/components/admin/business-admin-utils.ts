@@ -11,6 +11,7 @@ export const saleStatusLabels: Record<SaleStatus, string> = {
 export const expenseCategoryLabels: Record<ExpenseCategory, string> = {
   ADS: 'Ads',
   SUPPLIER: 'Fornecedor',
+  LTV: 'LTV',
   TOOLS: 'Ferramentas',
   OTHER: 'Outros',
 };

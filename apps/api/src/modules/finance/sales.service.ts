@@ -1,16 +1,27 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, SaleStatus, UserRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { MetaConversionsService } from '../meta/meta-conversions.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
-import { buildDateRange, cleanOptionalText, decimalToNumber, parseOptionalDate } from './finance.utils';
+import {
+  buildDateRange,
+  cleanOptionalText,
+  decimalToNumber,
+  parseOptionalDate,
+} from './finance.utils';
 
 interface SaleFilters {
   from?: string;
   to?: string;
   sellerId?: string;
+  contactId?: string;
   status?: SaleStatus;
   search?: string;
 }
@@ -36,10 +47,18 @@ export class SalesService {
   async create(user: AuthenticatedUser, dto: CreateSaleDto) {
     const sellerId = await this.resolveSellerId(user, dto.sellerId);
     const conversation = await this.resolveConversation(user, dto.conversationId);
+    const product = await this.resolveProduct(user, dto.productId);
     const contactId = cleanOptionalText(dto.contactId) ?? conversation?.contactId ?? null;
 
     if (contactId) {
       await this.assertContact(user, contactId);
+    }
+
+    const title = cleanOptionalText(dto.title) ?? product?.name;
+    const amount = dto.amount ?? (product ? decimalToNumber(product.price) : undefined);
+
+    if (!title || amount === undefined || amount <= 0) {
+      throw new BadRequestException('Sale requires a product or title and amount');
     }
 
     const sale = await this.prisma.sale.create({
@@ -48,8 +67,9 @@ export class SalesService {
         sellerId,
         contactId,
         conversationId: conversation?.id ?? null,
-        title: dto.title.trim(),
-        amount: dto.amount,
+        productId: product?.id ?? null,
+        title,
+        amount,
         status: dto.status ?? SaleStatus.PAID,
         note: cleanOptionalText(dto.note),
         soldAt: parseOptionalDate(dto.soldAt, 'soldAt') ?? new Date(),
@@ -58,6 +78,7 @@ export class SalesService {
     });
 
     this.syncPaidSaleWithMeta(user.organizationId, sale.id, sale.status);
+    await this.syncContactLtvTag(user.organizationId, sale.contactId, sale.id, sale.status);
 
     return this.serialize(sale);
   }
@@ -68,11 +89,17 @@ export class SalesService {
       where: { id },
       select: { status: true },
     });
-    const sellerId = dto.sellerId !== undefined ? await this.resolveSellerId(user, dto.sellerId) : undefined;
-    const conversation = dto.conversationId !== undefined ? await this.resolveConversation(user, dto.conversationId) : undefined;
+    const sellerId =
+      dto.sellerId !== undefined ? await this.resolveSellerId(user, dto.sellerId) : undefined;
+    const conversation =
+      dto.conversationId !== undefined
+        ? await this.resolveConversation(user, dto.conversationId)
+        : undefined;
+    const product =
+      dto.productId !== undefined ? await this.resolveProduct(user, dto.productId) : undefined;
     const contactId =
       dto.contactId !== undefined
-        ? cleanOptionalText(dto.contactId) ?? conversation?.contactId ?? null
+        ? (cleanOptionalText(dto.contactId) ?? conversation?.contactId ?? null)
         : conversation?.contactId;
 
     if (contactId) {
@@ -82,14 +109,23 @@ export class SalesService {
     const sale = await this.prisma.sale.update({
       where: { id },
       data: {
-        ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
-        ...(dto.amount !== undefined ? { amount: dto.amount } : {}),
+        ...(dto.title !== undefined
+          ? { title: dto.title.trim() }
+          : product
+            ? { title: product.name }
+            : {}),
+        ...(dto.amount !== undefined
+          ? { amount: dto.amount }
+          : product
+            ? { amount: decimalToNumber(product.price) }
+            : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.note !== undefined ? { note: cleanOptionalText(dto.note) } : {}),
         ...(dto.soldAt !== undefined ? { soldAt: parseOptionalDate(dto.soldAt, 'soldAt') } : {}),
         ...(dto.sellerId !== undefined ? { sellerId } : {}),
         ...(dto.contactId !== undefined || conversation ? { contactId: contactId ?? null } : {}),
         ...(dto.conversationId !== undefined ? { conversationId: conversation?.id ?? null } : {}),
+        ...(dto.productId !== undefined ? { productId: product?.id ?? null } : {}),
       },
       include: saleInclude,
     });
@@ -97,6 +133,7 @@ export class SalesService {
     if (sale.status === SaleStatus.PAID && previousSale?.status !== SaleStatus.PAID) {
       this.syncPaidSaleWithMeta(user.organizationId, sale.id, sale.status);
     }
+    await this.syncContactLtvTag(user.organizationId, sale.contactId, sale.id, sale.status);
 
     return this.serialize(sale);
   }
@@ -120,9 +157,15 @@ export class SalesService {
     }
 
     if (user.role !== UserRole.ADMIN) {
-      where.sellerId = user.id;
+      if (!filters.contactId?.trim()) {
+        where.sellerId = user.id;
+      }
     } else if (filters.sellerId?.trim()) {
       where.sellerId = filters.sellerId.trim();
+    }
+
+    if (filters.contactId?.trim()) {
+      where.contactId = filters.contactId.trim();
     }
 
     if (filters.search?.trim()) {
@@ -133,6 +176,7 @@ export class SalesService {
         { contact: { name: { contains: search, mode: 'insensitive' } } },
         { contact: { phone: { contains: search, mode: 'insensitive' } } },
         { seller: { name: { contains: search, mode: 'insensitive' } } },
+        { product: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -181,6 +225,25 @@ export class SalesService {
     return conversation;
   }
 
+  private async resolveProduct(user: AuthenticatedUser, productId?: string | null) {
+    const normalizedProductId = cleanOptionalText(productId);
+
+    if (!normalizedProductId) {
+      return null;
+    }
+
+    const product = await this.prisma.product.findFirst({
+      where: { id: normalizedProductId, organizationId: user.organizationId },
+      select: { id: true, name: true, price: true },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return product;
+  }
+
   private async assertContact(user: AuthenticatedUser, contactId: string) {
     const contact = await this.prisma.contact.findFirst({
       where: { id: contactId, organizationId: user.organizationId },
@@ -217,6 +280,12 @@ export class SalesService {
     return {
       ...sale,
       amount: decimalToNumber(sale.amount),
+      product: sale.product
+        ? {
+            ...sale.product,
+            price: decimalToNumber(sale.product.price),
+          }
+        : null,
     };
   }
 
@@ -226,6 +295,61 @@ export class SalesService {
     }
 
     void this.metaConversions.sendPurchaseForSale(organizationId, saleId).catch(() => undefined);
+  }
+
+  private async syncContactLtvTag(
+    organizationId: string,
+    contactId: string | null,
+    saleId: string,
+    status: SaleStatus,
+  ) {
+    if (status !== SaleStatus.PAID || !contactId) {
+      return;
+    }
+
+    const previousPaidSale = await this.prisma.sale.findFirst({
+      where: {
+        organizationId,
+        contactId,
+        status: SaleStatus.PAID,
+        id: { not: saleId },
+      },
+      select: { id: true },
+    });
+
+    if (!previousPaidSale) {
+      return;
+    }
+
+    const tag = await this.prisma.tag.upsert({
+      where: {
+        organizationId_name: {
+          organizationId,
+          name: 'LTV',
+        },
+      },
+      update: { color: '#0f766e' },
+      create: {
+        organizationId,
+        name: 'LTV',
+        color: '#0f766e',
+      },
+    });
+
+    await this.prisma.contactTag.upsert({
+      where: {
+        contactId_tagId: {
+          contactId,
+          tagId: tag.id,
+        },
+      },
+      update: {},
+      create: {
+        organizationId,
+        contactId,
+        tagId: tag.id,
+      },
+    });
   }
 }
 
@@ -238,6 +362,18 @@ const saleInclude = {
   },
   conversation: {
     select: { id: true, status: true },
+  },
+  product: {
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      description: true,
+      price: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   },
   metaConversionEvents: {
     take: 1,

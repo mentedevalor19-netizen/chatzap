@@ -1,17 +1,28 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  IsEnum,
+  IsISO8601,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 import { SaleStatus } from '@prisma/client';
 
 export class CreateSaleDto {
+  @IsOptional()
   @IsString()
   @MinLength(2)
   @MaxLength(140)
-  title!: string;
+  title?: string;
 
+  @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
-  amount!: number;
+  amount?: number;
 
   @IsOptional()
   @IsEnum(SaleStatus)
@@ -28,6 +39,10 @@ export class CreateSaleDto {
   @IsOptional()
   @IsString()
   conversationId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  productId?: string | null;
 
   @IsOptional()
   @IsString()

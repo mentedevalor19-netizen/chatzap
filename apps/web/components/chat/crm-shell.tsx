@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { FunnelAdminPanel } from '@/components/admin/funnel-admin-panel';
+import { QuickRepliesAdminPanel } from '@/components/admin/quick-replies-admin-panel';
 import { ContactPanel } from '@/components/chat/contact-panel';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { ConversationSidebar } from '@/components/chat/conversation-sidebar';
@@ -11,7 +12,9 @@ import { useChatStore } from '@/stores/chat-store';
 
 export function CrmShell() {
   useChatSocket();
-  const [workspaceTab, setWorkspaceTab] = useState<'conversations' | 'contacts' | 'admin'>('conversations');
+  const [workspaceTab, setWorkspaceTab] = useState<
+    'conversations' | 'contacts' | 'quickReplies' | 'admin'
+  >('conversations');
   const conversationsQuery = useConversations();
   const selectedConversationId = useChatStore((state) => state.selectedConversationId);
   const selectConversation = useChatStore((state) => state.selectConversation);
@@ -37,8 +40,14 @@ export function CrmShell() {
           tab={workspaceTab}
           onTabChange={setWorkspaceTab}
         />
-        {workspaceTab === 'admin' ? <FunnelAdminPanel /> : <ChatPanel conversation={selectedConversation} />}
-        {workspaceTab === 'admin' ? null : <ContactPanel conversation={selectedConversation} />}
+        {workspaceTab === 'admin' ? <FunnelAdminPanel /> : null}
+        {workspaceTab === 'quickReplies' ? <QuickRepliesAdminPanel /> : null}
+        {workspaceTab === 'conversations' || workspaceTab === 'contacts' ? (
+          <ChatPanel conversation={selectedConversation} />
+        ) : null}
+        {workspaceTab === 'admin' || workspaceTab === 'quickReplies' ? null : (
+          <ContactPanel conversation={selectedConversation} />
+        )}
       </div>
     </div>
   );

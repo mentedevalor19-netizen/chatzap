@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, LogOut, MessageSquareText, Plus, Search, UsersRound } from 'lucide-react';
+import { Bot, LogOut, MessageSquareText, Plus, Search, Sparkles, UsersRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { ContactSummary, ConversationSummary } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -19,8 +19,8 @@ import { cn, formatPhone, initials } from '@/lib/utils';
 interface ConversationSidebarProps {
   conversations: ConversationSummary[];
   loading: boolean;
-  tab: 'conversations' | 'contacts' | 'admin';
-  onTabChange: (tab: 'conversations' | 'contacts' | 'admin') => void;
+  tab: 'conversations' | 'contacts' | 'quickReplies' | 'admin';
+  onTabChange: (tab: 'conversations' | 'contacts' | 'quickReplies' | 'admin') => void;
 }
 
 const statusFilters = [
@@ -30,7 +30,12 @@ const statusFilters = [
   { value: 'CLOSED', label: 'Finalizadas' },
 ] as const;
 
-export function ConversationSidebar({ conversations, loading, tab, onTabChange }: ConversationSidebarProps) {
+export function ConversationSidebar({
+  conversations,
+  loading,
+  tab,
+  onTabChange,
+}: ConversationSidebarProps) {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const selectedConversationId = useChatStore((state) => state.selectedConversationId);
@@ -82,7 +87,7 @@ export function ConversationSidebar({ conversations, loading, tab, onTabChange }
           />
         </div>
 
-        <div className={cn('grid gap-2', user?.role === 'ADMIN' ? 'grid-cols-3' : 'grid-cols-2')}>
+        <div className="grid grid-cols-2 gap-2">
           <Button
             type="button"
             variant={tab === 'conversations' ? 'default' : 'outline'}
@@ -102,15 +107,26 @@ export function ConversationSidebar({ conversations, loading, tab, onTabChange }
             Contatos
           </Button>
           {user?.role === 'ADMIN' ? (
-            <Button
-              type="button"
-              variant={tab === 'admin' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => onTabChange('admin')}
-            >
-              <Bot />
-              Admin
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant={tab === 'quickReplies' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => onTabChange('quickReplies')}
+              >
+                <Sparkles />
+                Respostas
+              </Button>
+              <Button
+                type="button"
+                variant={tab === 'admin' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => onTabChange('admin')}
+              >
+                <Bot />
+                Admin
+              </Button>
+            </>
           ) : null}
         </div>
       </div>
@@ -156,8 +172,15 @@ export function ConversationSidebar({ conversations, loading, tab, onTabChange }
       {tab === 'contacts' ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
-            <span className="text-xs font-semibold uppercase text-muted-foreground">Lista de contatos</span>
-            <Button size="icon" variant="ghost" aria-label="Novo contato" onClick={() => setCreatingContact(true)}>
+            <span className="text-xs font-semibold uppercase text-muted-foreground">
+              Lista de contatos
+            </span>
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label="Novo contato"
+              onClick={() => setCreatingContact(true)}
+            >
               <Plus />
             </Button>
           </div>
@@ -180,7 +203,10 @@ export function ConversationSidebar({ conversations, loading, tab, onTabChange }
                 />
               ))
             ) : (
-              <EmptyList title="Nenhum contato" description="Crie contatos manualmente ou receba novas mensagens." />
+              <EmptyList
+                title="Nenhum contato"
+                description="Crie contatos manualmente ou receba novas mensagens."
+              />
             )}
           </div>
         </div>
@@ -192,7 +218,22 @@ export function ConversationSidebar({ conversations, loading, tab, onTabChange }
               <Bot className="h-6 w-6" />
             </div>
             <p className="mt-3 text-sm font-medium">Painel administrativo</p>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">Gerencie funil, equipe, vendas e financeiro.</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Gerencie funil, produtos, equipe, vendas e financeiro.
+            </p>
+          </div>
+        </div>
+      ) : null}
+      {tab === 'quickReplies' ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center px-8 text-center">
+          <div>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <p className="mt-3 text-sm font-medium">Respostas rapidas</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Crie comandos com texto e imagens para usar no chat.
+            </p>
           </div>
         </div>
       ) : null}
@@ -213,7 +254,9 @@ function ContactListItem({ contact, onClick }: { contact: ContactSummary; onClic
       </Avatar>
       <span className="min-w-0">
         <span className="block truncate text-sm font-semibold">{contact.name}</span>
-        <span className="block truncate text-xs text-muted-foreground">{formatPhone(contact.phone)}</span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {formatPhone(contact.phone)}
+        </span>
       </span>
     </button>
   );

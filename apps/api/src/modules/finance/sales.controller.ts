@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { SaleStatus } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -18,10 +28,11 @@ export class SalesController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('sellerId') sellerId?: string,
+    @Query('contactId') contactId?: string,
     @Query('status') status?: SaleStatus,
     @Query('search') search?: string,
   ) {
-    return this.salesService.findAll(user, { from, to, sellerId, status, search });
+    return this.salesService.findAll(user, { from, to, sellerId, contactId, status, search });
   }
 
   @Post()
@@ -30,7 +41,11 @@ export class SalesController {
   }
 
   @Patch(':id')
-  update(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: UpdateSaleDto) {
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateSaleDto,
+  ) {
     return this.salesService.update(user, id, dto);
   }
 

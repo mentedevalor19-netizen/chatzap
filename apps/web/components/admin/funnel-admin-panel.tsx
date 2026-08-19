@@ -11,6 +11,7 @@ import {
   FileUp,
   Image as ImageIcon,
   Music,
+  Package,
   Plus,
   ReceiptText,
   Save,
@@ -24,7 +25,7 @@ import { toast } from 'sonner';
 import type { FunnelStepSummary, FunnelStepType, FunnelSummary } from '@/lib/types';
 import { FinanceAdminPanel } from '@/components/admin/finance-admin-panel';
 import { MetaConversionsAdminPanel } from '@/components/admin/meta-conversions-admin-panel';
-import { QuickRepliesAdminPanel } from '@/components/admin/quick-replies-admin-panel';
+import { ProductsAdminPanel } from '@/components/admin/products-admin-panel';
 import { SalesAdminPanel } from '@/components/admin/sales-admin-panel';
 import { TeamAdminPanel } from '@/components/admin/team-admin-panel';
 import { Button } from '@/components/ui/button';
@@ -55,7 +56,7 @@ const stepTypes: Array<{ value: FunnelStepType; label: string }> = [
   { value: 'DOCUMENT', label: 'Documento' },
 ];
 
-type AdminSection = 'automation' | 'team' | 'sales' | 'finance' | 'meta';
+type AdminSection = 'automation' | 'team' | 'products' | 'sales' | 'finance' | 'meta';
 
 const adminSections: Array<{
   value: AdminSection;
@@ -66,7 +67,7 @@ const adminSections: Array<{
   {
     value: 'automation',
     label: 'Funil',
-    description: 'Fluxo inicial, delays, midias e respostas rapidas',
+    description: 'Fluxo inicial, delays e midias',
     Icon: Bot,
   },
   {
@@ -74,6 +75,12 @@ const adminSections: Array<{
     label: 'Equipe',
     description: 'Atendentes e acessos do painel',
     Icon: UsersRound,
+  },
+  {
+    value: 'products',
+    label: 'Produtos',
+    description: 'Catalogo usado para registrar vendas',
+    Icon: Package,
   },
   {
     value: 'sales',
@@ -107,7 +114,8 @@ export function FunnelAdminPanel() {
   const [handoffMessage, setHandoffMessage] = useState('Atendimento humano iniciado.');
   const [steps, setSteps] = useState<EditableFunnelStep[]>([]);
   const [saving, setSaving] = useState(false);
-  const currentAdminSection = adminSections.find((section) => section.value === adminSection) ?? adminSections[0];
+  const currentAdminSection =
+    adminSections.find((section) => section.value === adminSection) ?? adminSections[0];
 
   useEffect(() => {
     if (!funnelQuery.data) return;
@@ -143,7 +151,11 @@ export function FunnelAdminPanel() {
   }
 
   function removeStep(id: string) {
-    setSteps((current) => current.filter((step) => step.id !== id).map((step, index) => ({ ...step, position: index + 1 })));
+    setSteps((current) =>
+      current
+        .filter((step) => step.id !== id)
+        .map((step, index) => ({ ...step, position: index + 1 })),
+    );
   }
 
   function moveStep(id: string, direction: -1 | 1) {
@@ -174,10 +186,13 @@ export function FunnelAdminPanel() {
       const form = new FormData();
       form.append('file', file);
       const shouldUploadAsVoice = file.type.startsWith('audio/');
-      const upload = await apiFetch<UploadResponse>(shouldUploadAsVoice ? '/uploads?voice=true' : '/uploads', {
-        method: 'POST',
-        body: form,
-      });
+      const upload = await apiFetch<UploadResponse>(
+        shouldUploadAsVoice ? '/uploads?voice=true' : '/uploads',
+        {
+          method: 'POST',
+          body: form,
+        },
+      );
       const uploadedType = typeFromMime(upload.mimeType);
 
       updateStep(stepId, {
@@ -275,7 +290,7 @@ export function FunnelAdminPanel() {
         ) : null}
       </header>
 
-      <div className="grid gap-2 border-b border-border bg-card p-2 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-2 border-b border-border bg-card p-2 sm:grid-cols-2 xl:grid-cols-6">
         {adminSections.map((section) => (
           <button
             key={section.value}
@@ -283,7 +298,9 @@ export function FunnelAdminPanel() {
             onClick={() => setAdminSection(section.value)}
             className={cn(
               'flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-colors',
-              adminSection === section.value ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+              adminSection === section.value
+                ? 'bg-primary text-primary-foreground'
+                : 'hover:bg-muted',
             )}
           >
             <section.Icon className="h-4 w-4" />
@@ -297,8 +314,14 @@ export function FunnelAdminPanel() {
           <>
             <section className="grid gap-4 border-b border-border p-5 xl:grid-cols-[minmax(0,1fr)_280px]">
               <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase text-muted-foreground">Configuracao</p>
-                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nome do funil" />
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
+                  Configuracao
+                </p>
+                <Input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Nome do funil"
+                />
                 <Textarea
                   value={handoffMessage}
                   onChange={(event) => setHandoffMessage(event.target.value)}
@@ -355,10 +378,10 @@ export function FunnelAdminPanel() {
                 </div>
               )}
             </section>
-            <QuickRepliesAdminPanel />
           </>
         ) : null}
         {adminSection === 'team' ? <TeamAdminPanel /> : null}
+        {adminSection === 'products' ? <ProductsAdminPanel /> : null}
         {adminSection === 'sales' ? <SalesAdminPanel /> : null}
         {adminSection === 'finance' ? <FinanceAdminPanel /> : null}
         {adminSection === 'meta' ? <MetaConversionsAdminPanel /> : null}
@@ -407,7 +430,14 @@ function FunnelStepEditor({
         <div className="flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button type="button" variant="ghost" size="icon" aria-label="Subir etapa" disabled={first} onClick={() => onMove(-1)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Subir etapa"
+                disabled={first}
+                onClick={() => onMove(-1)}
+              >
                 <ArrowUp />
               </Button>
             </TooltipTrigger>
@@ -415,7 +445,14 @@ function FunnelStepEditor({
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button type="button" variant="ghost" size="icon" aria-label="Descer etapa" disabled={last} onClick={() => onMove(1)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Descer etapa"
+                disabled={last}
+                onClick={() => onMove(1)}
+              >
                 <ArrowDown />
               </Button>
             </TooltipTrigger>
@@ -423,7 +460,13 @@ function FunnelStepEditor({
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button type="button" variant="ghost" size="icon" aria-label="Excluir etapa" onClick={onDelete}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Excluir etapa"
+                onClick={onDelete}
+              >
                 <Trash2 />
               </Button>
             </TooltipTrigger>
@@ -446,7 +489,12 @@ function FunnelStepEditor({
               <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background px-3 py-4 text-sm font-medium transition-colors hover:bg-muted">
                 <FileUp className="h-4 w-4 text-primary" />
                 {step.uploading ? 'Enviando arquivo...' : 'Anexar arquivo'}
-                <input type="file" accept={acceptForType(step.type)} className="hidden" onChange={onUpload} />
+                <input
+                  type="file"
+                  accept={acceptForType(step.type)}
+                  className="hidden"
+                  onChange={onUpload}
+                />
               </label>
               <Input
                 value={step.mediaUrl ?? ''}
@@ -494,7 +542,9 @@ function FunnelStepEditor({
               min={0}
               max={3600}
               value={step.delaySeconds ?? 0}
-              onChange={(event) => onChange({ delaySeconds: normalizeDelayInput(event.target.value) })}
+              onChange={(event) =>
+                onChange({ delaySeconds: normalizeDelayInput(event.target.value) })
+              }
             />
           </label>
         </div>
@@ -520,19 +570,36 @@ function MediaPreview({ step }: { step: EditableFunnelStep }) {
     <div className="min-h-36 rounded-md border border-border bg-background p-3">
       <div className="mb-3 flex items-center gap-2 text-sm font-medium">
         {icon}
-        <span className="min-w-0 truncate">{step.fileName || step.caption || 'Midia do funil'}</span>
+        <span className="min-w-0 truncate">
+          {step.fileName || step.caption || 'Midia do funil'}
+        </span>
       </div>
       {step.type === 'IMAGE' && step.mediaUrl ? (
-        <img src={step.mediaUrl} alt={step.caption || 'Imagem do funil'} className="max-h-44 w-full rounded-md object-cover" />
+        <img
+          src={step.mediaUrl}
+          alt={step.caption || 'Imagem do funil'}
+          className="max-h-44 w-full rounded-md object-cover"
+        />
       ) : null}
-      {step.type === 'AUDIO' && step.mediaUrl ? <audio src={step.mediaUrl} controls className="w-full" /> : null}
-      {step.type === 'VIDEO' && step.mediaUrl ? <video src={step.mediaUrl} controls className="max-h-44 w-full rounded-md" /> : null}
+      {step.type === 'AUDIO' && step.mediaUrl ? (
+        <audio src={step.mediaUrl} controls className="w-full" />
+      ) : null}
+      {step.type === 'VIDEO' && step.mediaUrl ? (
+        <video src={step.mediaUrl} controls className="max-h-44 w-full rounded-md" />
+      ) : null}
       {step.type === 'DOCUMENT' && step.mediaUrl ? (
-        <a href={step.mediaUrl} target="_blank" rel="noreferrer" className="text-sm text-primary underline-offset-4 hover:underline">
+        <a
+          href={step.mediaUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm text-primary underline-offset-4 hover:underline"
+        >
           Abrir documento
         </a>
       ) : null}
-      {!step.mediaUrl ? <p className="text-sm text-muted-foreground">Sem arquivo anexado.</p> : null}
+      {!step.mediaUrl ? (
+        <p className="text-sm text-muted-foreground">Sem arquivo anexado.</p>
+      ) : null}
     </div>
   );
 }

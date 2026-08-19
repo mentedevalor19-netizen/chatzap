@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, UserRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { cleanOptionalText } from '../finance/finance.utils';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateQuickReplyDto } from './dto/create-quick-reply.dto';
 import { UpdateQuickReplyDto } from './dto/update-quick-reply.dto';
@@ -43,6 +44,9 @@ export class QuickRepliesService {
           organizationId: user.organizationId,
           shortcut: this.normalizeShortcut(dto.shortcut),
           body: dto.body.trim(),
+          mediaUrl: cleanOptionalText(dto.mediaUrl),
+          mimeType: cleanOptionalText(dto.mimeType),
+          fileName: cleanOptionalText(dto.fileName),
         },
       });
     } catch (error) {
@@ -61,6 +65,9 @@ export class QuickRepliesService {
         data: {
           ...(dto.shortcut !== undefined ? { shortcut: this.normalizeShortcut(dto.shortcut) } : {}),
           ...(dto.body !== undefined ? { body: dto.body.trim() } : {}),
+          ...(dto.mediaUrl !== undefined ? { mediaUrl: cleanOptionalText(dto.mediaUrl) } : {}),
+          ...(dto.mimeType !== undefined ? { mimeType: cleanOptionalText(dto.mimeType) } : {}),
+          ...(dto.fileName !== undefined ? { fileName: cleanOptionalText(dto.fileName) } : {}),
         },
       });
     } catch (error) {

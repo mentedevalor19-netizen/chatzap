@@ -98,6 +98,22 @@ admin123
 
 Troque essa senha assim que entrar.
 
+## Depois desta atualizacao
+
+Ao subir esta versao, o `migrate deploy` cria:
+
+- tabela `products` para o catalogo selecionavel de vendas;
+- vinculo opcional `product_id` em `sales`;
+- campos de imagem em `quick_replies`;
+- categoria de gasto `LTV`.
+
+Depois do deploy, entre no CRM e configure:
+
+- `Admin > Produtos`: cadastre os produtos que os atendentes vao selecionar ao marcar venda.
+- `Respostas`: crie atalhos `/comando` com texto e imagem opcional.
+- Painel lateral do lead: use `Marcar venda` para registrar a venda do contato/conversa atual.
+- `Admin > Financeiro`: use a categoria `LTV` para custos de recompra/remarketing e acompanhe receita, custo e lucro LTV.
+
 ## Configuracao na Meta
 
 No app da Meta, configure o webhook:

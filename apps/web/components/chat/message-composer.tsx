@@ -2,7 +2,7 @@
 
 import { ChangeEvent, DragEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileUp, Paperclip, SendHorizontal, X } from 'lucide-react';
+import { FileUp, Image as ImageIcon, Paperclip, SendHorizontal, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +18,12 @@ interface UploadResponse {
   mediaUrl: string;
 }
 
+interface AttachedQuickReplyMedia {
+  mediaUrl: string;
+  mimeType?: string | null;
+  fileName?: string | null;
+}
+
 export function MessageComposer({ conversationId }: { conversationId: string }) {
   const queryClient = useQueryClient();
   const quickRepliesQuery = useQuery({
@@ -27,6 +33,7 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
   });
   const [text, setText] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [quickReplyMedia, setQuickReplyMedia] = useState<AttachedQuickReplyMedia | null>(null);
   const [dragging, setDragging] = useState(false);
   const [sending, setSending] = useState(false);
   const [quickReplyIndex, setQuickReplyIndex] = useState(0);
@@ -60,7 +67,7 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
   }, [quickReplyQuery, quickReplySuggestions.length]);
 
   async function sendMessage() {
-    if (!text.trim() && !file) return;
+    if (!text.trim() && !file && !quickReplyMedia) return;
 
     setSending(true);
     try {
@@ -81,6 +88,17 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
             caption: text.trim() || undefined,
           }),
         });
+      } else if (quickReplyMedia) {
+        await apiFetch(`/conversations/${conversationId}/messages`, {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'IMAGE',
+            mediaUrl: quickReplyMedia.mediaUrl,
+            mimeType: quickReplyMedia.mimeType ?? undefined,
+            fileName: quickReplyMedia.fileName ?? undefined,
+            caption: text.trim() || undefined,
+          }),
+        });
       } else {
         await apiFetch(`/conversations/${conversationId}/messages`, {
           method: 'POST',
@@ -93,6 +111,7 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
 
       setText('');
       setFile(null);
+      setQuickReplyMedia(null);
       emitTyping('typing.stop', conversationId);
       await queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
       await queryClient.invalidateQueries({ queryKey: ['conversations'] });
@@ -105,7 +124,9 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
 
   function handleTextChange(value: string) {
     const completedShortcut = getCompletedQuickReplyCommand(value);
-    const directReply = completedShortcut ? findQuickReply(quickReplies, completedShortcut) : undefined;
+    const directReply = completedShortcut
+      ? findQuickReply(quickReplies, completedShortcut)
+      : undefined;
 
     if (directReply) {
       applyQuickReply(directReply);
@@ -129,6 +150,15 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
 
   function applyQuickReply(quickReply: QuickReplySummary) {
     setText(quickReply.body);
+    setQuickReplyMedia(
+      quickReply.mediaUrl
+        ? {
+            mediaUrl: quickReply.mediaUrl,
+            mimeType: quickReply.mimeType,
+            fileName: quickReply.fileName,
+          }
+        : null,
+    );
     startTyping();
     window.setTimeout(() => textareaRef.current?.focus(), 0);
   }
@@ -143,7 +173,9 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
 
       if (event.key === 'ArrowUp') {
         event.preventDefault();
-        setQuickReplyIndex((current) => (current - 1 + quickReplySuggestions.length) % quickReplySuggestions.length);
+        setQuickReplyIndex(
+          (current) => (current - 1 + quickReplySuggestions.length) % quickReplySuggestions.length,
+        );
         return;
       }
 
@@ -162,6 +194,7 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     setFile(event.target.files?.[0] ?? null);
+    setQuickReplyMedia(null);
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
@@ -170,6 +203,7 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
     const droppedFile = event.dataTransfer.files?.[0];
     if (droppedFile) {
       setFile(droppedFile);
+      setQuickReplyMedia(null);
     }
   }
 
@@ -191,9 +225,45 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
           <div className="flex min-w-0 items-center gap-2">
             <FileUp className="h-4 w-4 shrink-0 text-primary" />
             <span className="truncate">{file.name}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">{Math.round(file.size / 1024)} KB</span>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {Math.round(file.size / 1024)} KB
+            </span>
           </div>
-          <Button type="button" variant="ghost" size="icon" aria-label="Remover arquivo" onClick={() => setFile(null)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Remover arquivo"
+            onClick={() => setFile(null)}
+          >
+            <X />
+          </Button>
+        </div>
+      ) : null}
+
+      {quickReplyMedia ? (
+        <div className="mb-2 flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-sm">
+          <div className="flex min-w-0 items-center gap-2">
+            <ImageIcon className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate">
+              {quickReplyMedia.fileName || 'Imagem da resposta rapida'}
+            </span>
+            <a
+              href={quickReplyMedia.mediaUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="shrink-0 text-xs text-primary underline-offset-4 hover:underline"
+            >
+              preview
+            </a>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Remover imagem"
+            onClick={() => setQuickReplyMedia(null)}
+          >
             <X />
           </Button>
         </div>
@@ -217,7 +287,12 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
               <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
                 /{quickReply.shortcut}
               </span>
-              <span className="min-w-0 truncate text-sm text-foreground">{quickReply.body}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                {quickReply.mediaUrl ? (
+                  <ImageIcon className="h-4 w-4 shrink-0 text-primary" />
+                ) : null}
+                <span className="min-w-0 truncate text-sm text-foreground">{quickReply.body}</span>
+              </span>
             </button>
           ))}
         </div>
@@ -254,7 +329,7 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
               type="button"
               size="icon"
               aria-label="Enviar mensagem"
-              disabled={sending || (!text.trim() && !file)}
+              disabled={sending || (!text.trim() && !file && !quickReplyMedia)}
               onClick={() => void sendMessage()}
             >
               <SendHorizontal />

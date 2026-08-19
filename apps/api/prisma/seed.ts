@@ -22,7 +22,13 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: adminEmail },
-    update: { passwordHash, organizationId: organization.id, name: adminName, role: UserRole.ADMIN, isActive: true },
+    update: {
+      passwordHash,
+      organizationId: organization.id,
+      name: adminName,
+      role: UserRole.ADMIN,
+      isActive: true,
+    },
     create: {
       email: adminEmail,
       name: adminName,
@@ -37,6 +43,7 @@ async function main() {
     { name: 'Novo lead', color: '#2f80ed' },
     { name: 'VIP', color: '#16a34a' },
     { name: 'Financeiro', color: '#f97316' },
+    { name: 'LTV', color: '#0f766e' },
   ];
 
   for (const tag of tagDefinitions) {

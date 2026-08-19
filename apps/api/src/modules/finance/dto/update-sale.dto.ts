@@ -1,5 +1,14 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  IsEnum,
+  IsISO8601,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 import { SaleStatus } from '@prisma/client';
 
 export class UpdateSaleDto {
@@ -30,6 +39,10 @@ export class UpdateSaleDto {
   @IsOptional()
   @IsString()
   conversationId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  productId?: string | null;
 
   @IsOptional()
   @IsString()

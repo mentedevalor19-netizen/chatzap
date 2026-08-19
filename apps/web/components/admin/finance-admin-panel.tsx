@@ -10,9 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api';
 import { cn, formatCurrency, formatShortDate } from '@/lib/utils';
-import { expenseCategoryLabels, getCurrentMonthRange, toDateInputValue } from './business-admin-utils';
+import {
+  expenseCategoryLabels,
+  getCurrentMonthRange,
+  toDateInputValue,
+} from './business-admin-utils';
 
-const expenseCategories: ExpenseCategory[] = ['ADS', 'SUPPLIER', 'TOOLS', 'OTHER'];
+const expenseCategories: ExpenseCategory[] = ['ADS', 'SUPPLIER', 'LTV', 'TOOLS', 'OTHER'];
 
 export function FinanceAdminPanel() {
   const queryClient = useQueryClient();
@@ -27,11 +31,13 @@ export function FinanceAdminPanel() {
 
   const metricsQuery = useQuery({
     queryKey: ['crm-metrics', from, to],
-    queryFn: () => apiFetch<CrmMetricsSummary>(`/metrics/crm?${new URLSearchParams({ from, to }).toString()}`),
+    queryFn: () =>
+      apiFetch<CrmMetricsSummary>(`/metrics/crm?${new URLSearchParams({ from, to }).toString()}`),
   });
   const expensesQuery = useQuery({
     queryKey: ['expenses', from, to],
-    queryFn: () => apiFetch<ExpenseSummary[]>(`/expenses?${new URLSearchParams({ from, to }).toString()}`),
+    queryFn: () =>
+      apiFetch<ExpenseSummary[]>(`/expenses?${new URLSearchParams({ from, to }).toString()}`),
   });
 
   async function createExpense(event: FormEvent<HTMLFormElement>) {
@@ -79,12 +85,19 @@ export function FinanceAdminPanel() {
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
         </div>
       ) : metricsQuery.data ? (
         <MetricsOverview metrics={metricsQuery.data} />
       ) : null}
 
-      <form onSubmit={createExpense} className="grid gap-3 rounded-md border border-border bg-card p-4 xl:grid-cols-[190px_minmax(0,1fr)_150px_145px_120px]">
+      <form
+        onSubmit={createExpense}
+        className="grid gap-3 rounded-md border border-border bg-card p-4 xl:grid-cols-[190px_minmax(0,1fr)_150px_145px_120px]"
+      >
         <label className="space-y-1.5">
           <span className="text-xs font-medium text-muted-foreground">Categoria</span>
           <select
@@ -101,18 +114,32 @@ export function FinanceAdminPanel() {
         </label>
         <label className="space-y-1.5">
           <span className="text-xs font-medium text-muted-foreground">Descricao</span>
-          <Input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Ads, fornecedor, ferramenta..." />
+          <Input
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Ads, fornecedor, ferramenta..."
+          />
         </label>
         <label className="space-y-1.5">
           <span className="text-xs font-medium text-muted-foreground">Valor</span>
-          <Input type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} />
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+          />
         </label>
         <label className="space-y-1.5">
           <span className="text-xs font-medium text-muted-foreground">Data</span>
           <Input type="date" value={spentAt} onChange={(event) => setSpentAt(event.target.value)} />
         </label>
         <div className="flex items-end">
-          <Button type="submit" className="w-full" disabled={saving || !description.trim() || Number(amount) <= 0}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={saving || !description.trim() || Number(amount) <= 0}
+          >
             <ReceiptText />
             Lancar
           </Button>
@@ -143,12 +170,32 @@ export function FinanceAdminPanel() {
 
 function MetricsOverview({ metrics }: { metrics: CrmMetricsSummary }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       <MetricCard title="Faturamento" value={formatCurrency(metrics.revenue)} />
       <MetricCard title="Gastos" value={formatCurrency(metrics.expenses)} muted />
-      <MetricCard title="Lucro estimado" value={formatCurrency(metrics.profit)} positive={metrics.profit >= 0} />
-      <MetricCard title="Margem" value={`${metrics.marginPercent.toFixed(1)}%`} positive={metrics.marginPercent >= 0} />
+      <MetricCard
+        title="Lucro estimado"
+        value={formatCurrency(metrics.profit)}
+        positive={metrics.profit >= 0}
+      />
+      <MetricCard
+        title="Margem"
+        value={`${metrics.marginPercent.toFixed(1)}%`}
+        positive={metrics.marginPercent >= 0}
+      />
       <MetricCard title="Ticket medio" value={formatCurrency(metrics.averageTicket)} />
+      <MetricCard title="Vendas LTV" value={`${metrics.ltvSalesCount}`} />
+      <MetricCard
+        title="Receita LTV"
+        value={formatCurrency(metrics.ltvRevenue)}
+        positive={metrics.ltvRevenue > 0}
+      />
+      <MetricCard title="Custo LTV" value={formatCurrency(metrics.ltvCost)} muted />
+      <MetricCard
+        title="Lucro LTV"
+        value={formatCurrency(metrics.ltvProfit)}
+        positive={metrics.ltvProfit >= 0}
+      />
     </div>
   );
 }
@@ -187,12 +234,17 @@ function Breakdowns({ metrics }: { metrics: CrmMetricsSummary }) {
       <section className="rounded-md border border-border bg-card p-4">
         <div className="mb-3 flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-primary" />
-          <p className="text-xs font-semibold uppercase text-muted-foreground">Vendas por atendente</p>
+          <p className="text-xs font-semibold uppercase text-muted-foreground">
+            Vendas por atendente
+          </p>
         </div>
         <div className="space-y-2">
           {metrics.salesBySeller.length ? (
             metrics.salesBySeller.map((item) => (
-              <div key={item.sellerId ?? 'none'} className="flex items-center justify-between gap-3 text-sm">
+              <div
+                key={item.sellerId ?? 'none'}
+                className="flex items-center justify-between gap-3 text-sm"
+              >
                 <span className="min-w-0 truncate">{item.seller?.name ?? 'Sem atendente'}</span>
                 <span className="shrink-0 font-semibold text-primary">
                   {formatCurrency(item.revenue)} - {item.salesCount}
@@ -208,7 +260,9 @@ function Breakdowns({ metrics }: { metrics: CrmMetricsSummary }) {
       <section className="rounded-md border border-border bg-card p-4">
         <div className="mb-3 flex items-center gap-2">
           <ReceiptText className="h-4 w-4 text-primary" />
-          <p className="text-xs font-semibold uppercase text-muted-foreground">Gastos por categoria</p>
+          <p className="text-xs font-semibold uppercase text-muted-foreground">
+            Gastos por categoria
+          </p>
         </div>
         <div className="space-y-2">
           {metrics.expensesByCategory.length ? (
@@ -294,12 +348,20 @@ function ExpenseItem({ expense }: { expense: ExpenseSummary }) {
       </label>
       <label className="space-y-1.5">
         <span className="text-xs font-medium text-muted-foreground">Valor</span>
-        <Input type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} />
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+        />
       </label>
       <label className="space-y-1.5">
         <span className="text-xs font-medium text-muted-foreground">Data</span>
         <Input type="date" value={spentAt} onChange={(event) => setSpentAt(event.target.value)} />
-        <span className="block truncate text-xs text-muted-foreground">{formatShortDate(expense.spentAt)}</span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {formatShortDate(expense.spentAt)}
+        </span>
       </label>
       <div className="flex items-end gap-1">
         <Button

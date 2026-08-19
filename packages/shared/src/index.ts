@@ -34,7 +34,7 @@ export type FunnelStepType = (typeof funnelStepTypes)[number];
 export const saleStatuses = ['PENDING', 'PAID', 'CANCELLED', 'REFUNDED'] as const;
 export type SaleStatus = (typeof saleStatuses)[number];
 
-export const expenseCategories = ['ADS', 'SUPPLIER', 'TOOLS', 'OTHER'] as const;
+export const expenseCategories = ['ADS', 'SUPPLIER', 'LTV', 'TOOLS', 'OTHER'] as const;
 export type ExpenseCategory = (typeof expenseCategories)[number];
 
 export const metaConversionStatuses = ['PENDING', 'SENT', 'FAILED', 'SKIPPED'] as const;
@@ -133,6 +133,9 @@ export interface QuickReplySummary {
   id: string;
   shortcut: string;
   body: string;
+  mediaUrl?: string | null;
+  mimeType?: string | null;
+  fileName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -142,6 +145,17 @@ export interface UserSummary {
   name: string;
   email: string;
   role: 'ADMIN' | 'AGENT';
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductSummary {
+  id: string;
+  name: string;
+  sku?: string | null;
+  description?: string | null;
+  price: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -162,6 +176,7 @@ export interface SaleSummary {
     id: string;
     status: ConversationStatus;
   } | null;
+  product?: ProductSummary | null;
   metaConversionEvents?: Array<{
     id: string;
     eventName: string;
@@ -193,6 +208,10 @@ export interface CrmMetricsSummary {
   salesCount: number;
   pendingSalesCount: number;
   averageTicket: number;
+  ltvRevenue: number;
+  ltvSalesCount: number;
+  ltvCost: number;
+  ltvProfit: number;
   expenseCount: number;
   contactsCount: number;
   conversations: {
