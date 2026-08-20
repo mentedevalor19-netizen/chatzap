@@ -132,6 +132,7 @@ Base local: `http://localhost:4000/api/v1`
 | `POST`   | `/meta/conversions/sales/:saleId/send`                  | Envia manualmente uma venda paga para a Meta                             |
 | `POST`   | `/uploads`                                              | Upload com Multer                                                        |
 | `GET`    | `/uploads/files/:fileName`                              | Download/URL pública local                                               |
+| `GET`    | `/whatsapp/media/:mediaId`                              | Proxy para reproduzir mídias inbound da Meta                             |
 | `GET`    | `/search?q=`                                            | Busca global                                                             |
 | `GET`    | `/webhooks/whatsapp`                                    | Verificação Meta                                                         |
 | `POST`   | `/webhooks/whatsapp`                                    | Recebimento de eventos Meta                                              |
@@ -145,9 +146,9 @@ Base local: `http://localhost:4000/api/v1`
 5. Para mensagens recebidas, o backend faz upsert do contato por `waId`.
 6. Abre ou reutiliza uma conversa não finalizada.
 7. Persiste a mensagem no PostgreSQL com `rawPayload`.
-8. Para mídias, salva `mediaId`, `mimeType`, legenda, arquivo e tenta resolver a URL temporária pela Cloud API.
+8. Para mídias, salva `mediaId`, `mimeType`, legenda, arquivo e usa um proxy do backend para reproduzir a mídia com token da Cloud API.
 9. Se a mensagem veio de Click-to-WhatsApp Ads, salva o objeto `referral` em `AdAttribution`, incluindo `ctwa_clid`.
-10. Na primeira mensagem recebida de uma conversa nova, inicia o funil ativo.
+10. Na primeira mensagem recebida do contato, inicia o funil ativo.
 11. Se uma etapa estiver marcada para aguardar resposta, o funil pausa e continua na próxima mensagem inbound, independentemente do conteúdo.
 12. Ao concluir o funil, a conversa é atribuída a um humano e recebe uma mensagem interna de handoff.
 13. Para status `sent`, `delivered`, `read` ou `failed`, atualiza a mensagem outbound pelo `waMessageId`.
@@ -172,13 +173,14 @@ Base local: `http://localhost:4000/api/v1`
   - lista com não lidas, tags e preview;
   - área principal do chat;
   - cabeçalho do contato;
+  - foto do lead quando cadastrada manualmente por URL/upload;
   - histórico virtualizado;
   - scroll infinito para mensagens antigas;
   - envio de texto e anexos;
   - drag-and-drop de arquivos;
   - preview de upload;
   - respostas rápidas com `/comando` para preencher o input e anexar imagem cadastrada;
-  - painel lateral com dados, tags, notas, status, marcação de venda e histórico de vendas do lead.
+  - painel lateral com dados, foto manual, tags, notas, status, marcação de venda e histórico de vendas do lead.
   - botão manual para enviar o funil inicial e iniciar o handoff humano.
   - aba própria de respostas rápidas no menu principal.
   - aba `Admin` com subtelas para funil, equipe, produtos, vendas, financeiro e Meta Ads.

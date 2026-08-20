@@ -592,6 +592,18 @@ export class MetaConversionsService {
       return `Meta Conversions API failed with HTTP ${status}`;
     }
 
+    if (error.error_subcode === 2804132) {
+      return [
+        'WhatsApp Business Account nao associado ao Dataset da Meta.',
+        'Confira se o Dataset ID pertence ao mesmo negocio/WABA do numero oficial do WhatsApp e se o token tem permissao nesse dataset.',
+        error.message,
+        error.code ? `code ${error.code}` : null,
+        `subcode ${error.error_subcode}`,
+      ]
+        .filter(Boolean)
+        .join(' ');
+    }
+
     return [error.message, error.code ? `code ${error.code}` : null, error.error_subcode ? `subcode ${error.error_subcode}` : null]
       .filter(Boolean)
       .join(' ');

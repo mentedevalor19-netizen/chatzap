@@ -1,8 +1,9 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ChatMessage, ConversationSummary } from '@/lib/types';
+import { playNewMessageSound, rememberPlayedMessageId, warmNewMessageSound } from '@/lib/notification-sound';
 import { disconnectChatSocket, getChatSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatStore } from '@/stores/chat-store';
@@ -10,6 +11,7 @@ import { useChatStore } from '@/stores/chat-store';
 export function useChatSocket() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const selectedConversationId = useChatStore((state) => state.selectedConversationId);
+  const playedMessageIdsRef = useRef(new Set<string>());
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -19,6 +21,7 @@ export function useChatSocket() {
     }
 
     const socket = getChatSocket(accessToken);
+    warmNewMessageSound();
 
     const refreshConversations = () => {
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
@@ -44,16 +47,28 @@ export function useChatSocket() {
       refreshConversations();
     };
 
+    const handleCreatedMessage = (message: ChatMessage) => {
+      handleMessage(message);
+
+      if (message.direction !== 'INBOUND') {
+        return;
+      }
+
+      if (rememberPlayedMessageId(playedMessageIdsRef.current, message.id)) {
+        playNewMessageSound();
+      }
+    };
+
     socket.on('conversation.upsert', handleConversation);
     socket.on('conversation.read', refreshConversations);
-    socket.on('message.created', handleMessage);
+    socket.on('message.created', handleCreatedMessage);
     socket.on('message.status', handleMessage);
     socket.on('contact.upsert', () => void queryClient.invalidateQueries({ queryKey: ['contacts'] }));
 
     return () => {
       socket.off('conversation.upsert', handleConversation);
       socket.off('conversation.read', refreshConversations);
-      socket.off('message.created', handleMessage);
+      socket.off('message.created', handleCreatedMessage);
       socket.off('message.status', handleMessage);
       socket.off('contact.upsert');
     };
